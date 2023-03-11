@@ -1,0 +1,20 @@
+{
+  "name": "openxd",
+  "version": "1.0.0",
+  "description": "Open source UI designer",
+  "main": "index.js",
+  "scripts": {
+    "ui:start": "webpack -w --config ui/webpack.config.js",
+    "ui:serve": "webpack serve --config ui/webpack.config.js"
+  },
+  "author": "WhizSid <whizsid@aol.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@wasm-tool/wasm-pack-plugin": "^1.6.0",
+    "html-webpack-plugin": "^5.5.0",
+    "rimraf": "^3.0.2",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1",
+    "webpack-dev-server": "^4.11.1"
+  }
+}
