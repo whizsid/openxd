@@ -9,3 +9,5 @@ edition = "2021"
 rpc = { path = "../rpc", default-features = false, features = ["server"] }
 tarpc = { git = "https://github.com/whizsid/tarpc.git", branch = "wasm-support", default-features = false, features = ["server"] }
 async-trait = "^0.1"
+
+[features]

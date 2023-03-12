@@ -6,7 +6,7 @@ module.exports = {
   mode: "development",
   entry: path.resolve(__dirname, "index.js"),
   output: {
-    path: path.resolve(__dirname, "..", "dist/ui"),
+    path: path.resolve(__dirname, "..", "dist/frontend"),
     filename: "bundle.js",
   },
   plugins: [
@@ -152,7 +152,7 @@ module.exports = {
   },
   devServer: {
     static: {
-      directory: path.join(__dirname, "dist", "ui"),
+      directory: path.join(__dirname, "dist", "frontend"),
     },
     compress: true,
     port: 9000,

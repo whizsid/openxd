@@ -1,10 +1,12 @@
 target
 .vim
-ui/pkg
-cross_rt/example/pkg
+frontend/pkg
 yarn.lock
 node_modules/
 dist/
 ui/target
 server/target
 rpc/target
+frontend/target
+backend/target
+standalone/target
