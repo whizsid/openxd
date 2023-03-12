@@ -1,14 +1,13 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+use tarpc::context;
+use rpc::OpenXD;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Clone)]
+pub struct OpenXDServer {}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+#[tarpc::server]
+#[async_trait::async_trait]
+impl OpenXD for OpenXDServer {
+    async fn open_local(self, _: context::Context) -> Result<String, String> {
+        Ok(String::from("File opened"))
     }
 }

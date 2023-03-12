@@ -2,6 +2,7 @@ mod ui;
 mod state;
 mod app;
 mod components;
+mod transport;
 
 #[tokio::main]
 async fn main() {

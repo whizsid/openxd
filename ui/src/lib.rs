@@ -7,6 +7,7 @@ mod app;
 mod state;
 mod ui;
 mod components;
+mod transport;
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]

@@ -23,3 +23,8 @@ poll-promise = {version = "0.2.0", default-features = false, features = ["web"]}
 poll-promise = {version = "0.2.0", default-features = false, features = ["tokio"]}
 tokio = {version = "1.23.1", default-features = false, features = ["macros"]}
 
+[features]
+# Opening remote projects
+open_remote = []
+# Opening local files
+open_local = []
