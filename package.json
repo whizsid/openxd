@@ -4,8 +4,8 @@
   "description": "Open source UI designer",
   "main": "index.js",
   "scripts": {
-    "ui:start": "webpack -w --config ui/webpack.config.js",
-    "ui:serve": "webpack serve --config ui/webpack.config.js"
+    "frontend:start": "webpack -w --config frontend/webpack.config.js",
+    "frontend:serve": "webpack serve --config frontend/webpack.config.js"
   },
   "author": "WhizSid <whizsid@aol.com>",
   "license": "MIT",
