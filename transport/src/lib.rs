@@ -1,31 +1,31 @@
 use std::{
     pin::Pin,
-    sync::{mpsc::{channel, Receiver, Sender}, Mutex, Arc},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc, Mutex,
+    },
+    task::{Context, Poll},
 };
 
 use futures::{Sink, SinkExt, Stream, StreamExt};
 
 pub use futures::sink::Send;
 
-pub mod ui;
 pub mod app;
+pub mod ui;
 
 #[cfg(feature = "ui")]
 use app::ApplicationMessage as IncomingItem;
 #[cfg(feature = "ui")]
 use ui::UIMessage as OutgoingItem;
 
-
 #[cfg(feature = "app")]
 use app::ApplicationMessage as OutgoingItem;
 #[cfg(feature = "app")]
 use ui::UIMessage as IncomingItem;
 
-
-pub struct Client<
-    I: Stream<Item = IncomingItem> + Unpin,
-    O: Sink<OutgoingItem, Error = ()> + Unpin,
-> {
+pub struct Client<I: Stream<Item = IncomingItem> + Unpin, O: Sink<OutgoingItem, Error = ()> + Unpin>
+{
     incoming: Arc<Mutex<I>>,
     outgoing: O,
     subsribers: Vec<EventSubscriber>,
@@ -56,10 +56,8 @@ impl EventSubscriber {
     }
 }
 
-impl<
-        I: Stream<Item = IncomingItem> + Unpin,
-        O: Sink<OutgoingItem, Error = ()> + Unpin,
-    > Client<I, O>
+impl<I: Stream<Item = IncomingItem> + Unpin, O: Sink<OutgoingItem, Error = ()> + Unpin>
+    Client<I, O>
 {
     pub fn new(income: I, outgo: O) -> Client<I, O> {
         Client {
@@ -98,23 +96,24 @@ impl<
         self.subsribers.remove(index);
     }
 
-    pub fn new_subscriber<IT: TryFrom<IncomingItem>>(
-        &mut self,
-    ) -> (usize, Receiver<IncomingItem>) {
+    pub fn new_subscriber<IT: TryFrom<IncomingItem>>(&mut self) -> (usize, Receiver<IncomingItem>) {
         let (sender, receiver) = channel();
         let es = EventSubscriber::new(Box::new(|i| -> bool { IT::try_from(i).is_ok() }), sender);
         self.subsribers.push(es);
         (self.subsribers.len() - 1, receiver)
     }
 
-    pub async fn listen(&mut self) {
+    /// Synchronize the pending messages
+    pub fn sync(&mut self, cx: &mut Context) {
         let mut incoming = self.incoming.lock().unwrap();
-        let mut incoming_pin: Pin<&mut I> = Pin::new(&mut incoming);
-        while let Some(message) = incoming_pin.next().await {
-            for es in &self.subsribers {
-                let message = message.clone();
-                if es.satisfied(message.clone()) {
-                    es.notify(message);
+        let incoming_pin: Pin<&mut I> = Pin::new(&mut incoming);
+        if let Poll::Ready(message_opt) = incoming_pin.poll_next(cx) {
+            if let Some(message) = message_opt {
+                for es in &self.subsribers {
+                    let message = message.clone();
+                    if es.satisfied(message.clone()) {
+                        es.notify(message);
+                    }
                 }
             }
         }

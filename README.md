@@ -5,10 +5,10 @@ designers.
 
 ## Sub crates
 
-`transport` - Requests and Response types that share between backend and
+- `transport` - Requests and Response types that share between backend and
 frontend
-`ui` - Platform agnostic UI logics.
-`app` - Platform agnostic application logics
-`web` - Web Frontend
-`server` - Web Server
-`standalone` - Standalone application
+- `ui` - Platform agnostic UI logics.
+- `app` - Platform agnostic application logics
+- `web` - Web Frontend
+- `server` - Web Server
+- `standalone` - Standalone application
