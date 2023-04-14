@@ -12,3 +12,10 @@ frontend
 - `web` - Web Frontend
 - `server` - Web Server
 - `standalone` - Standalone application
+
+## Status
+
+Still this project is in early stage. So the project goals is to
+finalize the architecture. So the main goal is making a standalone and
+web dummy apps that sharing the same source code
+and communicating between servers.
