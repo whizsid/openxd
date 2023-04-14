@@ -1,13 +1,15 @@
 use ui::ui::Ui;
 use eframe::CreationContext;
 
+use crate::ws::{WebSocket, WebSocketError};
+
 pub struct WebApp {
-    ui: Ui
+    ui: Ui<WebSocketError, WebSocket>
 }
 
 impl WebApp {
-    pub fn new(cc: &CreationContext<'_>) -> Self {
-        WebApp { ui:  Ui::new() }
+    pub fn new(cc: &CreationContext<'_>, ws: WebSocket) -> WebApp {
+        WebApp { ui:  Ui::new(ws) }
     }
 }
 

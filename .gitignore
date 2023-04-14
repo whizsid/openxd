@@ -9,3 +9,4 @@ server/target
 transport/target
 standalone/target
 web/target
+.env

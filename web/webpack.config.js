@@ -1,6 +1,7 @@
 const path = require("path");
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const Dotenv = require("dotenv-webpack")
 
 module.exports = {
   mode: "development",
@@ -9,7 +10,10 @@ module.exports = {
     path: path.resolve(__dirname, "..", "dist/web"),
     filename: "bundle.js",
   },
-  plugins: [
+    plugins: [
+      new Dotenv({
+        path: path.resolve(__dirname,"..", ".env")
+      }),
       new HtmlWebpackPlugin({
         templateContent: ({htmlWebpackPlugin}) => `
             <html>

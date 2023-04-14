@@ -1,17 +1,20 @@
+use std::fmt::Debug;
+
 use egui::{CentralPanel, Context, TopBottomPanel};
+use futures::{Stream, Sink};
 use poll_promise::Promise;
 
 use crate::{app::App, components::menu::draw_menu_bar};
 
-pub struct Ui {
-    app: App,
+pub struct Ui<E: Debug, T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin> {
+    app: App<E, T>,
     file_open_promise: Option<Promise<Option<Vec<u8>>>>,
 }
 
-impl Ui {
-    pub fn new() -> Self {
+impl <E: Debug, T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin> Ui<E, T> {
+    pub fn new(transport: T) -> Self {
         Self {
-            app: App::new(),
+            app: App::new(transport),
             file_open_promise: None::<Promise<Option<Vec<u8>>>>,
         }
     }

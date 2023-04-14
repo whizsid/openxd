@@ -1,7 +1,11 @@
-use wasm_bindgen::prelude::*;
+use config::WS_URL;
 use eframe::web::AppRunnerRef;
+use wasm_bindgen::prelude::*;
+use ws::{WebSocketError, WebSocket};
 
 mod app;
+mod config;
+mod ws;
 
 #[wasm_bindgen]
 pub struct WebHandle {
@@ -38,15 +42,19 @@ pub async fn start_app(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsVal
 
 /// Call this once from the HTML.
 #[wasm_bindgen]
-pub async fn start_app_separate(
-    canvas_id: &str,
-) -> Result<WebHandle, wasm_bindgen::JsValue> {
+pub async fn start_app_separate(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsValue> {
     let web_options = eframe::WebOptions::default();
-    eframe::start_web(
-        canvas_id,
-        web_options,
-        Box::new(|cc| Box::new(crate::app::WebApp::new(cc))),
-    )
-    .await
-    .map(|handle| WebHandle { handle })
+    let ws_res = WebSocket::connect(WS_URL).await;
+    match ws_res {
+        Ok(ws) => eframe::start_web(
+            canvas_id,
+            web_options,
+            Box::new(|cc| Box::new(crate::app::WebApp::new(cc, ws))),
+        )
+        .await
+        .map(|handle| WebHandle { handle }),
+        Err(e) => {
+            Err(JsValue::from_str(&format!("{:?}", e)))
+        }
+    }
 }
