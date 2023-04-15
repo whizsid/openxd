@@ -1,14 +1,16 @@
 use ui::ui::Ui;
 use eframe::{CreationContext, App};
 
+use crate::bichannel::{BiChannelError, BiChannel};
+
 pub struct StandaloneApp {
-    ui: Ui
+    ui: Ui<BiChannelError, BiChannel<Vec<u8>, Vec<u8>>>
 }
 
 impl StandaloneApp {
-    pub fn new(_cc: &CreationContext<'_>) -> StandaloneApp {
+    pub fn new(_cc: &CreationContext<'_>, internal: BiChannel<Vec<u8>, Vec<u8>>) -> StandaloneApp {
         StandaloneApp {
-            ui: Ui::new()
+            ui: Ui::new(internal)
         }
     }
 }

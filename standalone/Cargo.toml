@@ -8,4 +8,8 @@ edition = "2021"
 [dependencies]
 ui = {path = "../ui"}
 eframe = "^0.21"
-tokio = {version = "^1.27", features = ["rt", "macros"]}
+tokio = {version = "^1.27", features = ["rt", "macros", "rt-multi-thread"]}
+futures = "^0.3"
+pin-project = "^1.0"
+transport = {path = "../transport"}
+app = {path = "../app"}

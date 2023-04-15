@@ -1,26 +1,34 @@
-use std::{fmt::Debug, sync::{Mutex, Arc}, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc};
 
 use egui::{CentralPanel, Context, TopBottomPanel};
 use futures::{Sink, Stream};
+use futures::lock::Mutex;
+use log::{error, info};
 use poll_promise::Promise;
-use log::{info, error};
 
-use crate::{components::menu::draw_menu_bar, state::AppState, client::Client};
+use crate::{client::Client, components::menu::draw_menu_bar, state::AppState};
 
-pub struct Ui<E: Debug + 'static, T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin + 'static> {
+pub struct Ui<
+    E: Debug + 'static,
+    T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin + Send + 'static,
+> {
     state: AppState,
-    client: Rc<RefCell<Client<E, T>>>,
+    client: Arc<Mutex<Client<E, T>>>,
     file_open_promise: Option<Promise<Option<Vec<u8>>>>,
-    ping_promise: Option<Promise<Result<(),()>>>,
+    ping_promise: Option<Promise<Result<(), ()>>>,
 }
 
-impl<E: Debug + 'static, T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin + 'static> Ui<E, T> {
+impl<
+        E: Debug + 'static,
+        T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin + Send + 'static,
+    > Ui<E, T>
+{
     pub fn new(transport: T) -> Self {
         Self {
             file_open_promise: None::<Promise<Option<Vec<u8>>>>,
-            client: Rc::new(RefCell::new(Client::new(transport))),
+            client: Arc::new(Mutex::new(Client::new(transport))),
             state: AppState::new(),
-            ping_promise: None::<Promise<Result<(),()>>>,
+            ping_promise: None::<Promise<Result<(), ()>>>,
         }
     }
 
@@ -45,7 +53,9 @@ impl<E: Debug + 'static, T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + 
         self.state.disable_main_ui();
         let client_cloned = self.client.clone();
         self.ping_promise.insert(Promise::spawn_async(async move {
-            client_cloned.borrow_mut().ping().await
+            let mut client = client_cloned.lock().await;
+            client.ping().await;
+            Ok(())
         }));
     }
 

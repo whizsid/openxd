@@ -2244,8 +2244,12 @@ dependencies = [
 name = "standalone"
 version = "0.1.0"
 dependencies = [
+ "app",
  "eframe",
+ "futures",
+ "pin-project",
  "tokio",
+ "transport",
  "ui",
 ]
 

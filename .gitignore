@@ -10,3 +10,4 @@ transport/target
 standalone/target
 web/target
 .env
+.DS_Store

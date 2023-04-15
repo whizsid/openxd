@@ -1,7 +1,7 @@
 use bincode::{deserialize as from_bin, serialize as to_bin, ErrorKind as BincodeError};
 use futures::{Sink, SinkExt, Stream, StreamExt};
-use serde::{Serialize, de::DeserializeOwned};
-use std::{fmt::Debug, pin::Pin, marker::PhantomData};
+use serde::{de::DeserializeOwned, Serialize};
+use std::{fmt::Debug, marker::PhantomData, pin::Pin};
 
 pub mod app;
 pub mod ui;
@@ -46,17 +46,18 @@ pub struct Client<
     _out: PhantomData<O>,
 }
 
-impl <
-    I: Serialize + DeserializeOwned + Clone + Debug + Sized,
-    O: Serialize + DeserializeOwned + Clone + Debug + Sized,
-    E: Debug,
-    T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin,
-> Client<I, O, E, T> {
+impl<
+        I: Serialize + DeserializeOwned + Clone + Debug + Sized,
+        O: Serialize + DeserializeOwned + Clone + Debug + Sized,
+        E: Debug,
+        T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin,
+    > Client<I, O, E, T>
+{
     pub fn new(internal: T) -> Client<I, O, E, T> {
         Client {
             internal,
             pending: Vec::new(),
-            _out: PhantomData
+            _out: PhantomData,
         }
     }
 
@@ -70,9 +71,7 @@ impl <
         Ok(response)
     }
 
-    pub async fn receive<IT: TryFrom<I, Error = ()>>(
-        &mut self,
-    ) -> Result<IT, ReceiveError> {
+    pub async fn receive<IT: TryFrom<I, Error = ()>>(&mut self) -> Result<IT, ReceiveError> {
         for (i, pending_message) in self.pending.iter().enumerate() {
             if let Ok(converted_message) = IT::try_from(pending_message.clone()) {
                 self.pending.remove(i);
