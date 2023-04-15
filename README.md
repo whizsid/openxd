@@ -13,6 +13,28 @@ frontend
 - `server` - Web Server
 - `standalone` - Standalone application
 
+## Architecture
+
+```
++-------------+                                            
+|             <--------------+                             
+|     Web     |              |                             
+|             |       +------|------+                      
++-------------+       |             <--------------+       
+       +---------------     UI      |              |       
++------v------+       |             |       +------|------+
+|             |       +-------------+       |             |
+| Standalone  |                             |  Transport  |
+|             |       +-------------+       |             |
++------^------+       |             |       +------|------+
+       +---------------     App     |              |       
++-------------+       |             <--------------+       
+|             |       +------|------+                      
+|   Server    |              |                             
+|             <--------------+                             
++-------------+                                            
+```
+
 ## Status
 
 - [x] Make standalone application, web server, web frontend by sharing same source code.
