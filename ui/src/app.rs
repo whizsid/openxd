@@ -21,12 +21,11 @@ impl<E: Debug, T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin> App
         self.state.disable_main_ui();
     }
 
-    pub async fn file_dialog_done(&mut self, _buf: Vec<u8>) {
-        self.client.ping().await.unwrap();
+    pub fn file_dialog_done(&mut self, _buf: Vec<u8>) {
         self.state.enable_main_ui();
     }
 
-    pub fn file_dilaog_canceled(&mut self) {
+    pub fn file_dialog_canceled(&mut self) {
         self.state.enable_main_ui();
     }
 

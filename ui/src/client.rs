@@ -1,12 +1,12 @@
 use std::fmt::Debug;
 
 use futures::{Sink, Stream};
-use transport::app::PongMessage;
-use transport::ui::PingMessage;
+use transport::app::{PongMessage, ApplicationMessage};
+use transport::ui::{PingMessage, UIMessage};
 use transport::Client as InternalClient;
 
 pub struct Client<E: Debug, T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin> {
-    internal: InternalClient<E, T>,
+    internal: InternalClient< ApplicationMessage, UIMessage, E, T>,
 }
 
 impl<E:Debug, T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin> Client<E,T> {

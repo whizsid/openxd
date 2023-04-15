@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ApplicationMessage {
     Test1,
     Test2,
@@ -16,5 +16,11 @@ impl TryFrom<ApplicationMessage> for PongMessage {
             ApplicationMessage::Pong => Ok(PongMessage),
             _ => Err(())
         }
+    }
+}
+
+impl Into<ApplicationMessage> for PongMessage {
+    fn into(self) -> ApplicationMessage {
+        ApplicationMessage::Pong
     }
 }

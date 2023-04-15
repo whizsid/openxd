@@ -10,7 +10,8 @@ edition = "2021"
 rfd = "0.10.0"
 egui = {version = "^0.21", default-features = false}
 futures = "^0.3"
-transport = {path = "../transport", features = ["ui"]}
+transport = {path = "../transport"}
+log = "^0.4"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 poll-promise = {version = "0.2.0", default-features = false, features = ["web"]}

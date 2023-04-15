@@ -1,7 +1,8 @@
-use config::WS_URL;
+use config::{WS_HOST, WS_PORT};
 use eframe::web::AppRunnerRef;
 use wasm_bindgen::prelude::*;
-use ws::{WebSocketError, WebSocket};
+use ws::WebSocket;
+use log::Level;
 
 mod app;
 mod config;
@@ -36,6 +37,7 @@ pub fn init_wasm_hooks() {
 /// You can add more callbacks like this if you want to call in to your code.
 #[wasm_bindgen]
 pub async fn start_app(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsValue> {
+    console_log::init_with_level(Level::Debug);
     init_wasm_hooks();
     start_app_separate(canvas_id).await
 }
@@ -44,7 +46,8 @@ pub async fn start_app(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsVal
 #[wasm_bindgen]
 pub async fn start_app_separate(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsValue> {
     let web_options = eframe::WebOptions::default();
-    let ws_res = WebSocket::connect(WS_URL).await;
+    let ws_url = format!("ws://{}:{}", WS_HOST, WS_PORT);
+    let ws_res = WebSocket::connect(&ws_url).await;
     match ws_res {
         Ok(ws) => eframe::start_web(
             canvas_id,
@@ -53,8 +56,6 @@ pub async fn start_app_separate(canvas_id: &str) -> Result<WebHandle, wasm_bindg
         )
         .await
         .map(|handle| WebHandle { handle }),
-        Err(e) => {
-            Err(JsValue::from_str(&format!("{:?}", e)))
-        }
+        Err(e) => Err(JsValue::from_str(&format!("{:?}", e))),
     }
 }
