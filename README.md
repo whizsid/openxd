@@ -15,7 +15,5 @@ frontend
 
 ## Status
 
-Still this project is in early stage. So the project goals is to
-finalize the architecture. So the main goal is making a standalone and
-web dummy apps that sharing the same source code
-and communicating between servers.
+- [x] Make standalone application, web server, web frontend by sharing same source code.
+- [ ] 'Open File' UI implementation.
