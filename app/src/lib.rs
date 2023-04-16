@@ -13,7 +13,7 @@ impl App {
         E: Debug,
         T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin,
     >(
-        &self,
+        &mut self,
         internal_client: T,
     ) -> Session<E, T> {
         Session::new(internal_client)
