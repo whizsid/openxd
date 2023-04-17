@@ -1,4 +1,4 @@
-use config::{WS_HOST, WS_PORT};
+use config::{WS_HOST, WS_PORT, WS_PATH};
 use eframe::web::AppRunnerRef;
 use wasm_bindgen::prelude::*;
 use ws::WebSocket;
@@ -7,6 +7,7 @@ use log::Level;
 mod app;
 mod config;
 mod ws;
+mod file_uploader;
 
 #[wasm_bindgen]
 pub struct WebHandle {
@@ -46,7 +47,7 @@ pub async fn start_app(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsVal
 #[wasm_bindgen]
 pub async fn start_app_separate(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsValue> {
     let web_options = eframe::WebOptions::default();
-    let ws_url = format!("ws://{}:{}", WS_HOST, WS_PORT);
+    let ws_url = format!("ws://{}:{}{}", WS_HOST, WS_PORT, WS_PATH);
     let ws_res = WebSocket::connect(&ws_url).await;
     match ws_res {
         Ok(ws) => eframe::start_web(

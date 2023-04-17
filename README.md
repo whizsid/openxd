@@ -9,8 +9,8 @@ designers.
 frontend
 - `ui` - Platform agnostic UI logics.
 - `app` - Platform agnostic application logics
-- `web` - Web Frontend
-- `server` - Web Server
+- `web` - Web frontend
+- `server` - Web socket server that handling active sessions
 - `standalone` - Standalone application
 
 ## Architecture
@@ -38,4 +38,5 @@ frontend
 ## Status
 
 - [x] Make standalone application, web server, web frontend by sharing same source code.
-- [ ] 'Open File' UI implementation.
+- [ ] 'Open File' implementation.
+- [ ] `Create File` implementation.
