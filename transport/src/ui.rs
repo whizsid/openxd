@@ -1,5 +1,13 @@
 use serde::{Serialize, Deserialize};
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum UIMessage {
+    Ping,
+    Close,
+    Error(String),
+    OpenFile(String)
+}
+
 #[derive(Clone)]
 pub struct PingMessage;
 
@@ -20,11 +28,22 @@ impl TryFrom<UIMessage> for PingMessage {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum UIMessage {
-    Test1,
-    Test2,
-    Ping,
-    Close,
-    Error(String)
+#[derive(Clone)]
+pub struct OpenFileMessage(String);
+
+impl Into<UIMessage> for OpenFileMessage {
+    fn into(self) -> UIMessage {
+        UIMessage::OpenFile(self.0)
+    }
+}
+
+impl TryFrom<UIMessage> for OpenFileMessage {
+    type Error = ();
+
+    fn try_from(value: UIMessage) -> Result<Self, Self::Error> {
+        match value {
+            UIMessage::OpenFile(cache_id) => Ok(OpenFileMessage(cache_id)),
+            _=> Err(())
+        }
+    }
 }

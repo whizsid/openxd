@@ -1,5 +1,6 @@
 mod bichannel;
 mod standalone_app;
+mod user_cache;
 
 use std::sync::Arc;
 

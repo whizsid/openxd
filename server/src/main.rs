@@ -21,6 +21,7 @@ static APP: Lazy<Mutex<App>> = Lazy::new(|| {
 });
 
 async fn ws_handler(ws: RouterifyWebSocket) {
+    println!("New websocket connection initialized");
     let local_ws = WebSocket::new(ws);
     let mut app = APP.lock().await;
     let mut session = app.create_session(local_ws);

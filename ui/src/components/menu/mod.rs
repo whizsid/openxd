@@ -1,47 +1,51 @@
-use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc};
+use std::{fmt::Debug, rc::Rc};
 
 use egui::Ui;
-use futures::{lock::Mutex, Sink, Stream};
+use futures::{Sink, Stream};
 
-use crate::{client::Client, remote_cache::RemoteCache, state::AppState};
+use crate::{client::ClientTransport, remote_cache::RemoteCache, scopes::ApplicationScope};
 
 use self::file_menu::FileMenuComponent;
+
+use super::UIComponent;
 
 mod file_menu;
 
 pub struct MenuComponent<
     TE: Debug + 'static,
-    CE: Debug,
-    T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = TE> + Unpin + Send + 'static,
+    CE: Debug +'static,
+    T: ClientTransport<TE> + Send + 'static,
     C: RemoteCache<Error = CE> + Send + Sync + 'static,
 > {
     file_menu: FileMenuComponent<TE, CE, T, C>,
+    app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
 }
 
 impl<
         TE: Debug + 'static,
-        CE: Debug,
-        T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = TE> + Unpin + Send + 'static,
+        CE: Debug + 'static,
+        T: ClientTransport<TE> + Send + 'static,
         C: RemoteCache<Error = CE> + Send + Sync + 'static,
     > MenuComponent<TE, CE, T, C>
 {
-    pub fn new(
-        app_state: Rc<RefCell<AppState>>,
-        client: Arc<Mutex<Client<TE, T>>>,
-        remote_cache: Arc<C>,
-    ) -> Self {
+    pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> Self {
         MenuComponent {
-            file_menu: FileMenuComponent::new(
-                app_state,
-                client,
-                remote_cache,
-            ),
+            file_menu: FileMenuComponent::new(app_scope.clone()),
+            app_scope,
         }
     }
+}
 
-    pub fn update(&mut self, ui: &mut Ui) {
+impl<
+        TE: Debug + 'static,
+        CE: Debug + 'static,
+        T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = TE> + Unpin + Send + 'static,
+        C: RemoteCache<Error = CE> + Send + Sync + 'static,
+    > UIComponent for MenuComponent<TE, CE, T, C>
+{
+    fn draw(&mut self, ui: &mut Ui) {
         egui::menu::bar(ui, |ui| {
-            self.file_menu.update(ui);
+            self.file_menu.draw(ui);
         });
     }
 }
