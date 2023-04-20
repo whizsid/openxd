@@ -2,24 +2,30 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use futures::{Sink, Stream};
-use transport::app::{ApplicationMessage, PongMessage};
-use transport::ui::{PingMessage, UIMessage};
-use transport::Client as InternalClient;
+use transport::app::{ApplicationMessage, FileOpenedMessage, PongMessage};
+use transport::ui::{OpenFileMessage, PingMessage, UIMessage};
+use transport::{Client as InternalClient, SendAndReceiveError};
 
-pub trait ClientTransport<E: Debug>: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin {}
+pub trait ClientTransport<E: Debug>:
+    Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin
+{
+}
 
-impl <E:Debug, T>ClientTransport<E> for T where T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin {}
+impl<E: Debug, T> ClientTransport<E> for T where
+    T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin
+{
+}
 
 pub struct Client<E: Debug, T: ClientTransport<E>> {
     internal: InternalClient<ApplicationMessage, UIMessage, E, T>,
-    _phantom: PhantomData<E>
+    _phantom: PhantomData<E>,
 }
 
 impl<E: Debug, T: ClientTransport<E>> Client<E, T> {
     pub fn new(internal: T) -> Client<E, T> {
         Client {
             internal: InternalClient::new(internal),
-            _phantom: PhantomData
+            _phantom: PhantomData,
         }
     }
 
@@ -29,5 +35,12 @@ impl<E: Debug, T: ClientTransport<E>> Client<E, T> {
             .await
             .unwrap();
         Ok(())
+    }
+
+    pub async fn file_open(&mut self, cache_id: String) -> Result<(), SendAndReceiveError<E>> {
+        self.internal
+            .send_and_receive::<OpenFileMessage, FileOpenedMessage>(OpenFileMessage::new(cache_id))
+            .await
+            .map(|_| ())
     }
 }

@@ -7,20 +7,20 @@ use crate::{
 };
 
 pub struct FileOpenCommand<
-    TE: Debug,
-    CE: Debug,
+    TE: Debug + 'static,
+    CE: Debug + 'static,
     T: ClientTransport<TE> + Send + 'static,
     C: RemoteCache<Error = CE> + Send + Sync + 'static,
 > {
     app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
     file_dialog_promise: Option<Promise<Option<Vec<u8>>>>,
     opened_file_cache_promise: Option<Promise<Result<String, String>>>,
-    file_open_promise: Option<Promise<Result<(), ()>>>,
+    file_open_promise: Option<Promise<Result<(), String>>>,
 }
 
 impl<
-        TE: Debug,
-        CE: Debug,
+        TE: Debug + 'static,
+        CE: Debug + 'static,
         T: ClientTransport<TE> + Send + 'static,
         C: RemoteCache<Error = CE> + Send + Sync + 'static,
     > FileOpenCommand<TE, CE, T, C>
@@ -47,7 +47,7 @@ impl<
             app_scope,
             file_dialog_promise: Some(file_dialog_promise),
             opened_file_cache_promise: None::<Promise<Result<String, String>>>,
-            file_open_promise: None::<Promise<Result<(), ()>>>,
+            file_open_promise: None::<Promise<Result<(), String>>>,
         }
     }
 
@@ -89,6 +89,31 @@ impl<
         self.app_scope
             .state_mut()
             .set_status_message("Opening the file");
+        let client = self.app_scope.client();
+        let _ = self.file_open_promise.insert(Promise::spawn_async(async move {
+            let mut client_locked = client.lock().await;
+            let res = client_locked.file_open(cache_id).await;
+            res.map_err(|e|format!("{:?}", e))
+        }));
+    }
+
+    pub fn file_opened(&mut self) {
+        let mut state_mut = self.app_scope.state_mut();
+        state_mut.enable_main_ui();
+        state_mut.clear_status_message();
+    }
+
+    pub fn file_open_failed(&mut self, err: String) {
+        let mut state_mut = self.app_scope.state_mut();
+        state_mut.add_dialog(
+            crate::state::Severity::Error,
+            format!(
+                "Error occured during opening the project. Original error:- {}",
+                err
+            ),
+        );
+        state_mut.enable_main_ui();
+        state_mut.clear_status_message();
     }
 }
 
@@ -100,7 +125,7 @@ impl<
     > Command for FileOpenCommand<TE, CE, T, C>
 {
     fn update(&mut self) -> bool {
-        let done = false;
+        let mut done = false;
         if let Some(file_dialog_promise) = self.file_dialog_promise.take() {
             if let Some(buf_opt) = file_dialog_promise.ready() {
                 self.file_dialog_promise = None;
@@ -130,6 +155,24 @@ impl<
             } else {
                 self.opened_file_cache_promise
                     .replace(opened_file_cache_promise);
+            }
+        }
+
+        if let Some(file_open_promise) = self.file_open_promise.take() {
+            if let Some(file_opened_res) =  file_open_promise.ready() {
+                self.file_open_promise = None;
+
+                match file_opened_res {
+                    Ok(_) => {
+                        self.file_opened();
+                        done = true;
+                    },
+                    Err(file_open_err) => {
+                        self.file_open_failed(file_open_err.clone());
+                    }
+                }
+            } else {
+                self.file_open_promise.replace(file_open_promise);
             }
         }
 

@@ -31,6 +31,12 @@ impl TryFrom<UIMessage> for PingMessage {
 #[derive(Clone)]
 pub struct OpenFileMessage(String);
 
+impl OpenFileMessage {
+    pub fn new(cache_id: String) -> OpenFileMessage {
+        OpenFileMessage(cache_id)
+    }
+}
+
 impl Into<UIMessage> for OpenFileMessage {
     fn into(self) -> UIMessage {
         UIMessage::OpenFile(self.0)
