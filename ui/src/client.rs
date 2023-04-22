@@ -6,22 +6,22 @@ use transport::app::{ApplicationMessage, FileOpenedMessage, PongMessage};
 use transport::ui::{OpenFileMessage, PingMessage, UIMessage};
 use transport::{Client as InternalClient, SendAndReceiveError};
 
-pub trait ClientTransport<E: Debug>:
-    Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin
+pub trait ClientTransport<E: Debug + Send>:
+    Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin + Send + 'static
 {
 }
 
-impl<E: Debug, T> ClientTransport<E> for T where
-    T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin
+impl<E: Debug + Send, T> ClientTransport<E> for T where
+    T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin + Send + 'static
 {
 }
 
-pub struct Client<E: Debug, T: ClientTransport<E>> {
+pub struct Client<E: Debug + Send, T: ClientTransport<E>> {
     internal: InternalClient<ApplicationMessage, UIMessage, E, T>,
     _phantom: PhantomData<E>,
 }
 
-impl<E: Debug, T: ClientTransport<E>> Client<E, T> {
+impl<E: Debug + Send, T: ClientTransport<E>> Client<E, T> {
     pub fn new(internal: T) -> Client<E, T> {
         Client {
             internal: InternalClient::new(internal),

@@ -8,11 +8,13 @@ use app::App;
 use bichannel::BiChannel;
 use eframe::{run_native, NativeOptions};
 use futures::lock::Mutex;
+use simple_logger::SimpleLogger;
 use standalone_app::StandaloneApp;
 use tokio::spawn;
 
 #[tokio::main]
 async fn main() {
+    SimpleLogger::new().init().unwrap();
     let app = Arc::new(Mutex::new(App::new()));
     let (uichannel, appchannel) = BiChannel::<Vec<u8>, Vec<u8>>::new::<Vec<u8>, Vec<u8>>();
     spawn(async move {

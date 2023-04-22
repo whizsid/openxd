@@ -5,25 +5,27 @@ use egui::{CentralPanel, Context, TopBottomPanel};
 use crate::client::ClientTransport;
 use crate::components::UIComponent;
 use crate::components::menu::MenuComponent;
+use crate::components::status_bar::StatusBarComponent;
 use crate::remote_cache::RemoteCache;
 use crate::scopes::ApplicationScope;
 
 pub struct Ui<
-    TE: Debug + 'static,
+    TE: Debug + Send + 'static,
     CE: Debug + 'static,
-    T: ClientTransport<TE> + Send + 'static,
-    C: RemoteCache<Error = CE> + Send + Sync + 'static,
+    T: ClientTransport<TE>,
+    C: RemoteCache<Error = CE>,
 > {
     scope: Rc<ApplicationScope<TE, CE, T, C>>,
     // Componentes
     menu_component: MenuComponent<TE, CE, T, C>,
+    status_bar_component: StatusBarComponent<TE, CE, T, C>,
 }
 
 impl<
-        TE: Debug + 'static,
+        TE: Debug + Send + 'static,
         CE: Debug + 'static,
-        T: ClientTransport<TE> + Send + 'static,
-        C: RemoteCache<Error = CE> + Send + Sync + 'static,
+        T: ClientTransport<TE>,
+        C: RemoteCache<Error = CE>,
     > Ui<TE, CE, T, C>
 {
     pub fn new(transport: T, remote_cache: C) -> Self {
@@ -31,7 +33,8 @@ impl<
         
         Self {
             scope: app_scope.clone(),
-            menu_component: MenuComponent::new(app_scope),
+            menu_component: MenuComponent::new(app_scope.clone()),
+            status_bar_component: StatusBarComponent::new(app_scope)
         }
     }
 
@@ -45,6 +48,10 @@ impl<
             ui.add_enabled_ui(!main_ui_disabled, |ui| {
                 self.menu_component.draw(ui);
             });
+        });
+
+        TopBottomPanel::bottom("status-bar").exact_height(24.00).show(ctx, |ui|{
+            self.status_bar_component.draw(ui);
         });
 
         CentralPanel::default().show(ctx, |ui| {

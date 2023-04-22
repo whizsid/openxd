@@ -1,6 +1,7 @@
 use egui::Ui;
 
 pub mod menu;
+pub mod status_bar;
 
 pub trait UIComponent {
     /// Drawing the UI

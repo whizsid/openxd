@@ -7,10 +7,10 @@ use crate::{
 };
 
 pub struct FileOpenCommand<
-    TE: Debug + 'static,
+    TE: Debug + Send + 'static,
     CE: Debug + 'static,
-    T: ClientTransport<TE> + Send + 'static,
-    C: RemoteCache<Error = CE> + Send + Sync + 'static,
+    T: ClientTransport<TE>,
+    C: RemoteCache<Error = CE>,
 > {
     app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
     file_dialog_promise: Option<Promise<Option<Vec<u8>>>>,
@@ -19,16 +19,16 @@ pub struct FileOpenCommand<
 }
 
 impl<
-        TE: Debug + 'static,
+        TE: Debug + Send + 'static,
         CE: Debug + 'static,
-        T: ClientTransport<TE> + Send + 'static,
-        C: RemoteCache<Error = CE> + Send + Sync + 'static,
+        T: ClientTransport<TE>,
+        C: RemoteCache<Error = CE>,
     > FileOpenCommand<TE, CE, T, C>
 {
     pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> Self {
         let mut state_mut = app_scope.state_mut();
         state_mut.disable_main_ui();
-        state_mut.set_status_message(String::from("Opening the file"));
+        state_mut.set_status_message(String::from("Select the file"));
         drop(state_mut);
 
         let file_dialog_promise = Promise::spawn_async(async move {
@@ -82,7 +82,6 @@ impl<
         );
         state_mut.enable_main_ui();
         state_mut.clear_status_message();
-        drop(state_mut);
     }
 
     pub fn open_file(&mut self, cache_id: String) {
@@ -93,7 +92,14 @@ impl<
         let _ = self.file_open_promise.insert(Promise::spawn_async(async move {
             let mut client_locked = client.lock().await;
             let res = client_locked.file_open(cache_id).await;
-            res.map_err(|e|format!("{:?}", e))
+            match res {
+                Err(e) => {
+                    Err(format!("{:?}", e))
+                },
+                Ok(_) => {
+                    Ok(())
+                }
+            }
         }));
     }
 
@@ -118,10 +124,10 @@ impl<
 }
 
 impl<
-        TE: Debug,
+        TE: Debug + Send,
         CE: Debug,
-        T: ClientTransport<TE> + Send + 'static,
-        C: RemoteCache<Error = CE> + Send + Sync + 'static,
+        T: ClientTransport<TE>,
+        C: RemoteCache<Error = CE>,
     > Command for FileOpenCommand<TE, CE, T, C>
 {
     fn update(&mut self) -> bool {

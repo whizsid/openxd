@@ -13,3 +13,4 @@ futures = "^0.3"
 pin-project = "^1.0"
 transport = {path = "../transport"}
 app = {path = "../app"}
+simple_logger = "4.1.0"

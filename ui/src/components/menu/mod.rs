@@ -1,7 +1,6 @@
 use std::{fmt::Debug, rc::Rc};
 
 use egui::Ui;
-use futures::{Sink, Stream};
 
 use crate::{client::ClientTransport, remote_cache::RemoteCache, scopes::ApplicationScope};
 
@@ -12,20 +11,20 @@ use super::UIComponent;
 mod file_menu;
 
 pub struct MenuComponent<
-    TE: Debug + 'static,
+    TE: Debug + Send + 'static,
     CE: Debug +'static,
-    T: ClientTransport<TE> + Send + 'static,
-    C: RemoteCache<Error = CE> + Send + Sync + 'static,
+    T: ClientTransport<TE>,
+    C: RemoteCache<Error = CE>,
 > {
     file_menu: FileMenuComponent<TE, CE, T, C>,
     app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
 }
 
 impl<
-        TE: Debug + 'static,
+        TE: Debug + Send + 'static,
         CE: Debug + 'static,
-        T: ClientTransport<TE> + Send + 'static,
-        C: RemoteCache<Error = CE> + Send + Sync + 'static,
+        T: ClientTransport<TE>,
+        C: RemoteCache<Error = CE>,
     > MenuComponent<TE, CE, T, C>
 {
     pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> Self {
@@ -37,10 +36,10 @@ impl<
 }
 
 impl<
-        TE: Debug + 'static,
+        TE: Debug + Send + 'static,
         CE: Debug + 'static,
-        T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = TE> + Unpin + Send + 'static,
-        C: RemoteCache<Error = CE> + Send + Sync + 'static,
+        T: ClientTransport<TE>,
+        C: RemoteCache<Error = CE>,
     > UIComponent for MenuComponent<TE, CE, T, C>
 {
     fn draw(&mut self, ui: &mut Ui) {

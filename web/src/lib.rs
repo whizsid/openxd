@@ -38,7 +38,7 @@ pub fn init_wasm_hooks() {
 /// You can add more callbacks like this if you want to call in to your code.
 #[wasm_bindgen]
 pub async fn start_app(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsValue> {
-    console_log::init_with_level(Level::Debug);
+    console_log::init_with_level(Level::Debug).unwrap();
     init_wasm_hooks();
     start_app_separate(canvas_id).await
 }

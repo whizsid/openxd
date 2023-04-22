@@ -12,19 +12,19 @@ pub enum FileMenuComponentEvent {
 }
 
 pub struct FileMenuComponent<
-    TE: Debug + 'static,
+    TE: Debug + Send + 'static,
     CE: Debug + 'static,
-    T: ClientTransport<TE> + Send + 'static,
-    C: RemoteCache<Error = CE> + Send + Sync + 'static,
+    T: ClientTransport<TE>,
+    C: RemoteCache<Error = CE>,
 > {
     app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
 }
 
 impl<
-        TE: Debug + 'static,
+        TE: Debug + Send + 'static,
         CE: Debug + 'static,
-        T: ClientTransport<TE> + Send + 'static,
-        C: RemoteCache<Error = CE> + Send + Sync + 'static,
+        T: ClientTransport<TE>,
+        C: RemoteCache<Error = CE>,
     > FileMenuComponent<TE, CE, T, C>
 {
     pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> Self {
@@ -42,10 +42,10 @@ impl<
 }
 
 impl<
-        TE: Debug + 'static,
+        TE: Debug + Send + 'static,
         CE: Debug + 'static,
-        T: ClientTransport<TE> + Send + 'static,
-        C: RemoteCache<Error = CE> + Send + Sync + 'static,
+        T: ClientTransport<TE>,
+        C: RemoteCache<Error = CE>,
     > UIComponent for FileMenuComponent<TE, CE, T, C>
 {
     fn draw(&mut self, ui: &mut Ui) {

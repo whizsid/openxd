@@ -4,7 +4,7 @@ use futures::lock::Mutex;
 
 use crate::{client::{ClientTransport, Client}, remote_cache::RemoteCache, commands::{Executor, Command}, state::AppState};
 
-pub struct ApplicationScope<TE: Debug, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>> {
+pub struct ApplicationScope<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>> {
     client: Arc<Mutex<Client<TE, T>>>,
     remote_cache: Arc<C>,
     command_executor: Rc<RefCell<Executor>>,
@@ -12,7 +12,7 @@ pub struct ApplicationScope<TE: Debug, CE: Debug, T: ClientTransport<TE>, C: Rem
     _phantom: PhantomData<TE>
 }
 
-impl <TE: Debug, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>> ApplicationScope<TE, CE, T, C> {
+impl <TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>> ApplicationScope<TE, CE, T, C> {
     pub fn new(transport: T ,remote_cache: C) -> ApplicationScope<TE, CE, T, C> {
         let command_executor = Rc::new(RefCell::new(Executor::new()));
         let arc_client = Arc::new(Mutex::new(Client::new(transport)));
