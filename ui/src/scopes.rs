@@ -1,9 +1,15 @@
+//! Application Scopes
+//!
+//! Some shared values/interfaces only required for a specific scope (for canvas, for menu bar).
+//! But some values/interfaces are application wide. So we have to redefine what are the required
+//! parameters for each component. Those scopes will avoid those redefinitions.
 use std::{fmt::Debug, marker::PhantomData, sync::Arc, rc::Rc, cell::{RefCell, Ref, RefMut}};
 
 use futures::lock::Mutex;
 
 use crate::{client::{ClientTransport, Client}, remote_cache::RemoteCache, commands::{Executor, Command}, state::AppState};
 
+/// Application wide scope
 pub struct ApplicationScope<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>> {
     client: Arc<Mutex<Client<TE, T>>>,
     remote_cache: Arc<C>,
@@ -28,26 +34,35 @@ impl <TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error 
         }
     }
 
+    /// Getter for a non mutable reference to application wide state
     pub fn state(&self) -> Ref<AppState> {
         self.state.borrow()
     }
 
+    /// Getter for a mutable reference to application wide state
     pub fn state_mut(&self) -> RefMut<AppState> {
         self.state.borrow_mut()
     }
 
+    /// Executing a command using command executor
     pub fn execute<CMD: Command + 'static>(&self, cmd: CMD) {
         self.command_executor.borrow_mut().execute(cmd);
     }
 
+    /// Getting a reference for the remote cache
     pub fn remote_cache(&self) -> Arc<C> {
         self.remote_cache.clone()
     }
     
+    /// Getting a reference for the client
     pub fn client(&self) -> Arc<Mutex<Client<TE,T>>> {
         self.client.clone()
     }
 
+    /// Updating the command executor
+    ///
+    /// This method will run in the egui event loop. This method will update
+    /// the command status using the `poll_promise` promises.
     pub fn update_cmd_executor(&self) {
         self.command_executor.borrow_mut().update();
     }

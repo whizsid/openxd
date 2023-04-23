@@ -1,3 +1,8 @@
+//! This module will control all the other UI components
+//!
+//! All the components defined in `components` module should be linked
+//! here.
+
 use std::{fmt::Debug, rc::Rc};
 
 use egui::{CentralPanel, Context, TopBottomPanel};
@@ -28,6 +33,7 @@ impl<
         C: RemoteCache<Error = CE>,
     > Ui<TE, CE, T, C>
 {
+    /// Creating the main UI by passing external interfaces
     pub fn new(transport: T, remote_cache: C) -> Self {
         let app_scope = Rc::new(ApplicationScope::new(transport, remote_cache));
         
@@ -38,7 +44,10 @@ impl<
         }
     }
 
-    // Updatng the UI in one iteration in the event loop
+    /// Updating the components and command statuses in a one iteration in event loop.
+    ///
+    /// Please refer the [eframe::App::update](https://docs.rs/eframe/latest/eframe/trait.App.html#tymethod.update)
+    /// method.
     pub fn update(&mut self, ctx: &Context) {
         let main_ui_disabled = self.scope.state().is_main_ui_disabled();
 
