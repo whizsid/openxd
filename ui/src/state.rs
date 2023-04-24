@@ -73,6 +73,16 @@ impl AppState {
     pub fn remove_dialog(&mut self, index: usize) -> AppDialog {
         self.dialogs.remove(index)
     }
+
+    /// Get a reference to a single dialog by the id
+    pub fn get_dialog(&self, index: usize) -> Option<&AppDialog> {
+        self.dialogs.get(index)
+    }
+
+    /// Dialog count
+    pub fn len_dialogs(&self) -> usize {
+        self.dialogs.len()
+    } 
 }
 
 /// Severity of dialogs and dialog buttons

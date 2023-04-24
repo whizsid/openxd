@@ -89,18 +89,19 @@ impl<
             .state_mut()
             .set_status_message("Opening the file");
         let client = self.app_scope.client();
-        let _ = self.file_open_promise.insert(Promise::spawn_async(async move {
-            let mut client_locked = client.lock().await;
-            let res = client_locked.file_open(cache_id).await;
-            match res {
-                Err(e) => {
-                    Err(format!("{:?}", e))
-                },
-                Ok(_) => {
-                    Ok(())
+        let _ = self
+            .file_open_promise
+            .insert(Promise::spawn_async(async move {
+                let mut client_locked = client.lock().await;
+                let res = client_locked.file_open(cache_id).await;
+                match res {
+                    Err(e) => Err(format!("{:?}", e)),
+                    Ok(res) => match res.into() {
+                        Ok(_opened_message) => Ok(()),
+                        Err(server_err) => Err(format!("Remote: {:?}", server_err)),
+                    },
                 }
-            }
-        }));
+            }));
     }
 
     pub fn file_opened(&mut self) {
@@ -123,12 +124,8 @@ impl<
     }
 }
 
-impl<
-        TE: Debug + Send,
-        CE: Debug,
-        T: ClientTransport<TE>,
-        C: RemoteCache<Error = CE>,
-    > Command for FileOpenCommand<TE, CE, T, C>
+impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>> Command
+    for FileOpenCommand<TE, CE, T, C>
 {
     fn update(&mut self) -> bool {
         let mut done = false;
@@ -165,14 +162,14 @@ impl<
         }
 
         if let Some(file_open_promise) = self.file_open_promise.take() {
-            if let Some(file_opened_res) =  file_open_promise.ready() {
+            if let Some(file_opened_res) = file_open_promise.ready() {
                 self.file_open_promise = None;
 
                 match file_opened_res {
                     Ok(_) => {
                         self.file_opened();
                         done = true;
-                    },
+                    }
                     Err(file_open_err) => {
                         self.file_open_failed(file_open_err.clone());
                     }

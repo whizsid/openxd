@@ -2,31 +2,17 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ApplicationMessage {
-    Test1,
-    Test2,
-    Pong,
-    FileOpened
-}
-
-pub struct PongMessage;
-
-impl TryFrom<ApplicationMessage> for PongMessage {
-    type Error = ();
-    fn try_from(value: ApplicationMessage) -> Result<Self, Self::Error> {
-        match value {
-            ApplicationMessage::Pong => Ok(PongMessage),
-            _ => Err(())
-        }
-    }
-}
-
-impl Into<ApplicationMessage> for PongMessage {
-    fn into(self) -> ApplicationMessage {
-        ApplicationMessage::Pong
-    }
+    FileOpened,
+    Error(String)
 }
 
 pub struct FileOpenedMessage;
+
+impl FileOpenedMessage {
+    pub fn new() -> FileOpenedMessage {
+        FileOpenedMessage
+    }
+}
 
 impl TryFrom<ApplicationMessage> for FileOpenedMessage {
     type Error = ();
@@ -41,5 +27,29 @@ impl TryFrom<ApplicationMessage> for FileOpenedMessage {
 impl Into<ApplicationMessage> for FileOpenedMessage{
     fn into(self) -> ApplicationMessage {
         ApplicationMessage::FileOpened
+    }
+}
+
+pub struct ErrorMessage(String);
+
+impl ErrorMessage {
+    pub fn new(err: String) -> ErrorMessage {
+        ErrorMessage(err)
+    }
+}
+
+impl TryFrom<ApplicationMessage> for ErrorMessage {
+    type Error = ();
+    fn try_from(value: ApplicationMessage) -> Result<Self, Self::Error> {
+        match value {
+            ApplicationMessage::Error(err)=> Ok(ErrorMessage::new(err)),
+            _ => Err(())
+        }
+    }
+}
+
+impl Into<ApplicationMessage> for ErrorMessage {
+    fn into(self) -> ApplicationMessage {
+        ApplicationMessage::Error(self.0)
     }
 }

@@ -5,7 +5,7 @@
 
 use std::{fmt::Debug, rc::Rc};
 
-use egui::{CentralPanel, Context, TopBottomPanel};
+use egui::{CentralPanel, Context, TopBottomPanel, Area, pos2};
 
 use crate::client::ClientTransport;
 use crate::components::UIComponent;
@@ -59,14 +59,25 @@ impl<
             });
         });
 
-        TopBottomPanel::bottom("status-bar").exact_height(24.00).show(ctx, |ui|{
+        TopBottomPanel::bottom("status-bar").exact_height(22.00).show(ctx, |ui|{
             self.status_bar_component.draw(ui);
         });
+
+        let state = self.scope.state();
+        let dialog_len = state.len_dialogs();
+        for i in 0..dialog_len {
+            let dialog = state.get_dialog(i).unwrap();
+            Area::new(format!("dialog-{}", i)).fixed_pos(pos2(-0.01,-0.01)).show(ctx, |ui| {
+                ui.label(dialog.message());
+            });
+        }
 
         CentralPanel::default().show(ctx, |ui| {
             ui.add_enabled_ui(!main_ui_disabled, |ui| {
                 ui.heading("Hello World!");
             })
         });
+
+
     }
 }

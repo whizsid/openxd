@@ -1,6 +1,9 @@
 use futures::{Sink, Stream};
+use messages::ConnectionStartMessage;
 use std::fmt::Debug;
-use transport::{app::{ApplicationMessage, PongMessage}, ui::{UIMessage, PingMessage}, Client};
+use transport::{app::{ApplicationMessage, ErrorMessage, FileOpenedMessage}, ui::UIMessage, Client};
+
+mod messages;
 
 pub struct App {}
 
@@ -32,12 +35,14 @@ impl<E: Debug, T: Stream<Item = Vec<u8>> + Sink<Vec<u8>, Error = E> + Unpin> Ses
     }
 
     pub async fn start(&mut self) {
-        self.handle_ping().await;
-    }
-
-    pub async fn handle_ping(&mut self) {
-        self.client.receive::<PingMessage>().await.expect("Can not get ping message");
-        println!("Ping Message Received");
-        self.client.send(PongMessage).await.expect("Can not send pong message");
+        let start_message_res = self.client.receive::<ConnectionStartMessage>().await;
+        match start_message_res {
+            Ok(start_message) => {
+                self.client.send(FileOpenedMessage::new()).await.unwrap();
+            },
+            Err(start_err) => {
+                self.client.send(ErrorMessage::new(format!("{:?}", start_err))).await.unwrap();
+            }
+        }
     }
 }
