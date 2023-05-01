@@ -49,4 +49,9 @@ impl Executor {
     pub fn execute<T: Command + 'static>(&mut self, cmd: T) {
         self.commands.push(Box::new(cmd));
     }
+
+    /// Schedule a boxed command to run
+    pub fn execute_boxed(&mut self, cmd: Box<dyn Command + 'static>) {
+        self.commands.push(cmd);
+    }
 }

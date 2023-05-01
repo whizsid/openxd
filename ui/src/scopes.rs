@@ -49,6 +49,11 @@ impl <TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error 
         self.command_executor.borrow_mut().execute(cmd);
     }
 
+    /// Executing a boxed command using command executor
+    pub fn execute_boxed(&self, cmd: Box<dyn Command + 'static>) {
+        self.command_executor.borrow_mut().execute_boxed(cmd);
+    }
+
     /// Getting a reference for the remote cache
     pub fn remote_cache(&self) -> Arc<C> {
         self.remote_cache.clone()
