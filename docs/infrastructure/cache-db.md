@@ -19,3 +19,14 @@ and embedded database and a cloud database.
 - MongoDB
 - MySQL
 - Surreal
+
+## Decision
+
+SQLite and RocksDB are very matured projects as embedded database engines. But RocksDB 
+is just a key-value DB, we can not query our components using coordinates. Sled and tikv
+are Rust embedded databases. But both
+database engines are just key-value storages. Surreal DB is a new innovative DB engine
+that built entirely using Rust. It provides a powerful query system which help us to query
+components by using coordinates. Also it using RocksDB as a BE key-value storage and they
+hoping to move to Sled. Also there is a cloud version of Surreal DB. So we can share the
+same queries and same data structures between our cloud and desktop version applications.
