@@ -4,7 +4,7 @@ use egui::Ui;
 
 use crate::{
     client::ClientTransport, commands::file::open_file::FileOpenCommand, components::UIComponent,
-    remote_cache::RemoteCache, scopes::ApplicationScope,
+    cache::Cache, scopes::ApplicationScope,
 };
 
 pub enum FileMenuComponentEvent {
@@ -15,7 +15,7 @@ pub struct FileMenuComponent<
     TE: Debug + Send + 'static,
     CE: Debug + 'static,
     T: ClientTransport<TE>,
-    C: RemoteCache<Error = CE>,
+    C: Cache<Error = CE>,
 > {
     app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
 }
@@ -24,7 +24,7 @@ impl<
         TE: Debug + Send + 'static,
         CE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: RemoteCache<Error = CE>,
+        C: Cache<Error = CE>,
     > FileMenuComponent<TE, CE, T, C>
 {
     pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> Self {
@@ -45,7 +45,7 @@ impl<
         TE: Debug + Send + 'static,
         CE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: RemoteCache<Error = CE>,
+        C: Cache<Error = CE>,
     > UIComponent for FileMenuComponent<TE, CE, T, C>
 {
     fn draw(&mut self, ui: &mut Ui) {

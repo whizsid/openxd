@@ -1,15 +1,15 @@
 use ui::ui::Ui;
 use eframe::CreationContext;
 
-use crate::{ws::{WebSocket, WebSocketError}, file_uploader::{FileUploader, FileUploaderError}};
+use crate::{ws::{WebSocket, WebSocketError}, cache::{RemoteCache, RemoteCacheError}};
 
 pub struct WebApp {
-    ui: Ui<WebSocketError, FileUploaderError, WebSocket, FileUploader>
+    ui: Ui<WebSocketError, RemoteCacheError, WebSocket, RemoteCache>
 }
 
 impl WebApp {
     pub fn new(cc: &CreationContext<'_>, ws: WebSocket) -> WebApp {
-        WebApp { ui:  Ui::new(ws, FileUploader::new()) }
+        WebApp { ui:  Ui::new(ws, RemoteCache::new()) }
     }
 }
 

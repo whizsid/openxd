@@ -12,7 +12,7 @@ use crate::components::dialog_container::DialogContainerComponent;
 use crate::components::menu::MenuComponent;
 use crate::components::status_bar::StatusBarComponent;
 use crate::components::{UIComponent, TopLevelUIComponent};
-use crate::remote_cache::RemoteCache;
+use crate::cache::Cache;
 use crate::scopes::ApplicationScope;
 
 
@@ -20,7 +20,7 @@ pub struct Ui<
     TE: Debug + Send + 'static,
     CE: Debug + 'static,
     T: ClientTransport<TE>,
-    C: RemoteCache<Error = CE>,
+    C: Cache<Error = CE>,
 > {
     scope: Rc<ApplicationScope<TE, CE, T, C>>,
     // Componentes
@@ -33,7 +33,7 @@ impl<
         TE: Debug + Send + 'static,
         CE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: RemoteCache<Error = CE>,
+        C: Cache<Error = CE>,
     > Ui<TE, CE, T, C>
 {
     /// Creating the main UI by passing external interfaces

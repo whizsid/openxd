@@ -7,13 +7,13 @@ use futures::{
 use js_sys::{Function, Uint8Array};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, Error as JsonError};
-use ui::remote_cache::RemoteCache;
+use ui::cache::Cache;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{Blob, FormData, XmlHttpRequest};
 
 use crate::config::API_URL;
 
-pub struct FileUploader;
+pub struct RemoteCache;
 
 #[derive(Serialize, Deserialize)]
 pub struct SuccessResponse {
@@ -21,7 +21,7 @@ pub struct SuccessResponse {
 }
 
 #[derive(Debug)]
-pub enum FileUploaderError {
+pub enum RemoteCacheError {
     RequestCreationError(String),
     ResponseFormatError(String),
     ResponseMismatch(u16, String),
@@ -29,9 +29,9 @@ pub enum FileUploaderError {
     Json(JsonError)
 }
 
-impl FileUploader {
-    pub fn new() -> FileUploader {
-        FileUploader
+impl RemoteCache {
+    pub fn new() -> RemoteCache {
+        RemoteCache
     }
 }
 
@@ -41,10 +41,10 @@ enum Message {
     ResponseError(String),
 }
 
-impl RemoteCache for FileUploader {
-    type Error = FileUploaderError;
+impl Cache for RemoteCache {
+    type Error = RemoteCacheError;
 
-    fn cache<'a>(
+    fn cache_file<'a>(
         self: Arc<Self>,
         buf: Vec<u8>,
     ) -> Pin<Box<dyn Future<Output = Result<String, Self::Error>> + Send + 'a>> {
@@ -97,25 +97,25 @@ impl RemoteCache for FileUploader {
 
         Box::pin(async move {
             if let Some(creation_error) = creation_error {
-                return Err(FileUploaderError::RequestCreationError(creation_error));
+                return Err(RemoteCacheError::RequestCreationError(creation_error));
             }
             let received = receiver.await;
             match received {
                 Ok(message) => match message {
                     Message::ResponseError(res_err) => {
-                        Err(FileUploaderError::ResponseFormatError(res_err))
+                        Err(RemoteCacheError::ResponseFormatError(res_err))
                     }
                     Message::Response(status, txt) if status >= 200 && status < 300 => {
                         match from_str::<'_, SuccessResponse>(&txt) {
                             Ok(res_obj) => Ok(res_obj.id),
-                            Err(json_err) => Err(FileUploaderError::Json(json_err))
+                            Err(json_err) => Err(RemoteCacheError::Json(json_err))
                         }
                     }
                     Message::Response(status, txt) => {
-                        Err(FileUploaderError::ResponseMismatch(status, txt))
+                        Err(RemoteCacheError::ResponseMismatch(status, txt))
                     }
                 },
-                Err(_) => Err(FileUploaderError::Canceled),
+                Err(_) => Err(RemoteCacheError::Canceled),
             }
         })
     }

@@ -7,10 +7,10 @@ use std::{fmt::Debug, marker::PhantomData, sync::Arc, rc::Rc, cell::{RefCell, Re
 
 use futures::lock::Mutex;
 
-use crate::{client::{ClientTransport, Client}, remote_cache::RemoteCache, commands::{Executor, Command}, state::AppState};
+use crate::{client::{ClientTransport, Client}, cache::Cache, commands::{Executor, Command}, state::AppState};
 
 /// Application wide scope
-pub struct ApplicationScope<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>> {
+pub struct ApplicationScope<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>> {
     client: Arc<Mutex<Client<TE, T>>>,
     remote_cache: Arc<C>,
     command_executor: Rc<RefCell<Executor>>,
@@ -18,7 +18,7 @@ pub struct ApplicationScope<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>,
     _phantom: PhantomData<TE>
 }
 
-impl <TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>> ApplicationScope<TE, CE, T, C> {
+impl <TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>> ApplicationScope<TE, CE, T, C> {
     pub fn new(transport: T ,remote_cache: C) -> ApplicationScope<TE, CE, T, C> {
         let command_executor = Rc::new(RefCell::new(Executor::new()));
         let arc_client = Arc::new(Mutex::new(Client::new(transport)));

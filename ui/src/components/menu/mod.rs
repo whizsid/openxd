@@ -2,7 +2,7 @@ use std::{fmt::Debug, rc::Rc};
 
 use egui::Ui;
 
-use crate::{client::ClientTransport, remote_cache::RemoteCache, scopes::ApplicationScope};
+use crate::{client::ClientTransport, cache::Cache, scopes::ApplicationScope};
 
 use self::file_menu::FileMenuComponent;
 
@@ -14,7 +14,7 @@ pub struct MenuComponent<
     TE: Debug + Send + 'static,
     CE: Debug +'static,
     T: ClientTransport<TE>,
-    C: RemoteCache<Error = CE>,
+    C: Cache<Error = CE>,
 > {
     file_menu: FileMenuComponent<TE, CE, T, C>,
     app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
@@ -24,7 +24,7 @@ impl<
         TE: Debug + Send + 'static,
         CE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: RemoteCache<Error = CE>,
+        C: Cache<Error = CE>,
     > MenuComponent<TE, CE, T, C>
 {
     pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> Self {
@@ -39,7 +39,7 @@ impl<
         TE: Debug + Send + 'static,
         CE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: RemoteCache<Error = CE>,
+        C: Cache<Error = CE>,
     > UIComponent for MenuComponent<TE, CE, T, C>
 {
     fn draw(&mut self, ui: &mut Ui) {

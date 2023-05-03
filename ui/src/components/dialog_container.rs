@@ -2,7 +2,7 @@ use std::{fmt::Debug, rc::Rc};
 
 use egui::{pos2, Align, Area, Frame, Layout, Margin};
 
-use crate::{client::ClientTransport, remote_cache::RemoteCache, scopes::ApplicationScope};
+use crate::{client::ClientTransport, cache::Cache, scopes::ApplicationScope};
 
 use super::TopLevelUIComponent;
 
@@ -14,12 +14,12 @@ pub struct DialogContainerComponent<
     TE: Debug + Send,
     CE: Debug,
     T: ClientTransport<TE>,
-    C: RemoteCache<Error = CE>,
+    C: Cache<Error = CE>,
 > {
     app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
 }
 
-impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>>
+impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>>
     DialogContainerComponent<TE, CE, T, C>
 {
     pub fn new(
@@ -65,7 +65,7 @@ impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error =
     }
 }
 
-impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>>
+impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>>
     TopLevelUIComponent for DialogContainerComponent<TE, CE, T, C>
 {
     fn draw(&mut self, ctx: &egui::Context) {

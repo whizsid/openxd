@@ -7,7 +7,7 @@ use log::Level;
 mod app;
 mod config;
 mod ws;
-mod file_uploader;
+mod cache;
 
 #[wasm_bindgen]
 pub struct WebHandle {

@@ -3,14 +3,14 @@ use std::{fmt::Debug, rc::Rc};
 use poll_promise::Promise;
 
 use crate::{
-    client::ClientTransport, commands::Command, remote_cache::RemoteCache, scopes::ApplicationScope,
+    client::ClientTransport, commands::Command, cache::Cache, scopes::ApplicationScope,
 };
 
 pub struct FileOpenCommand<
     TE: Debug + Send + 'static,
     CE: Debug + 'static,
     T: ClientTransport<TE>,
-    C: RemoteCache<Error = CE>,
+    C: Cache<Error = CE>,
 > {
     app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
     file_dialog_promise: Option<Promise<Option<Vec<u8>>>>,
@@ -22,7 +22,7 @@ impl<
         TE: Debug + Send + 'static,
         CE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: RemoteCache<Error = CE>,
+        C: Cache<Error = CE>,
     > FileOpenCommand<TE, CE, T, C>
 {
     pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> Self {
@@ -66,7 +66,7 @@ impl<
         let _ = self
             .opened_file_cache_promise
             .insert(Promise::spawn_async(async move {
-                let cached_res = cache.cache(buf).await;
+                let cached_res = cache.cache_file(buf).await;
                 cached_res.map_err(|e| format!("{:?}", e))
             }));
     }
@@ -124,7 +124,7 @@ impl<
     }
 }
 
-impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: RemoteCache<Error = CE>> Command
+impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>> Command
     for FileOpenCommand<TE, CE, T, C>
 {
     fn update(&mut self) -> bool {
