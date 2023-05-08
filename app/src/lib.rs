@@ -10,8 +10,8 @@ mod asset;
 pub mod cache;
 mod client;
 mod messages;
-mod oxd;
-mod storage;
+pub mod oxd;
+pub mod storage;
 
 pub struct App<SI: StorageId, SE: Debug, D: Connection, S: Storage<SE, SI>> {
     cache: Cache<SI, SE, D, S>,
@@ -30,15 +30,14 @@ impl<SI: StorageId, SE: Debug, D: Connection, S: Storage<SE, SI>> App<SI, SE, D,
         Ok(session_id)
     }
 
-    pub async fn start_session<
+    pub fn init_session<
         E: Debug + Send,
-        T: ClientTransport<E>,
-        R: AsyncBufRead + Send + Sync + Unpin,
+        T: ClientTransport<E>
     >(
         &mut self,
         internal_client: T,
-    ) -> Result<Session<E, T>, CacheFileError<SE>> {
-        Ok(Session::new(internal_client))
+    ) -> Session<E, T> {
+        Session::new(internal_client)
     }
 }
 

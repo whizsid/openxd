@@ -79,11 +79,13 @@ impl<SI: StorageId, SE: Debug, T: Connection, S: Storage<SE, SI>> Cache<SI, SE, 
                     } else {
                         match detect_asset_type_by_ext(ext.to_str().unwrap()) {
                             Some(_) => {
+                                let ext = ext.to_str().unwrap();
+                                let ext_cloned = String::from(ext);
                                 let path_new = entry.path().unwrap();
                                 let path_buf = path_new.to_path_buf();
                                 let id = self
                                     .storage
-                                    .put(&mut entry, String::new())
+                                    .put(&mut entry, format!("session/{}/assets", session_id), ext_cloned)
                                     .await
                                     .map_err(|e| CacheFileError::Storage(e))?;
                                 path_id_map.insert(path_buf, id);
