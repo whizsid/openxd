@@ -1,7 +1,7 @@
 use cache::{Cache, CacheFileError};
 use std::{fmt::Debug, sync::Arc};
 use storage::{Storage, StorageId};
-use surrealdb::{Connection, Surreal};
+use surrealdb::{Connection, Surreal, sql::Id};
 use tokio::io::AsyncBufRead;
 use uuid::Uuid;
 use client::{Client, ClientTransport};
@@ -38,9 +38,10 @@ impl<SI: StorageId, SE: Debug, D: Connection, S: Storage<SE, SI>> App<SI, SE, D,
         T: ClientTransport<E>
     >(
         &mut self,
-        internal_client: T,
+        user_id: String,
+        internal_client: T
     ) -> Session<E, T> {
-        Session::new(internal_client)
+        Session::new( Id::String(user_id), internal_client)
     }
 
     /// Accessing the internal database connection
@@ -51,14 +52,16 @@ impl<SI: StorageId, SE: Debug, D: Connection, S: Storage<SE, SI>> App<SI, SE, D,
 
 pub struct Session<TE: Debug + Send, T: ClientTransport<TE>> {
     client: Client<TE, T>,
+    user_id: Id,
     id: Option<Uuid>,
 }
 
 impl<TE: Debug + Send, T: ClientTransport<TE>> Session<TE, T> {
-    pub fn new(internal_client: T) -> Session<TE, T> {
+    pub fn new(user_id: Id,internal_client: T) -> Session<TE, T> {
         Session {
             client: Client::new(internal_client),
-            id: None
+            id: None,
+            user_id
         }
     }
 

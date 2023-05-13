@@ -40,8 +40,7 @@ use surrealdb::opt::auth::Namespace as NamespaceAuth;
 #[cfg(feature = "db-auth-root")]
 use surrealdb::opt::auth::Root as RootAuth;
 use surrealdb::{
-    sql::Id,
-    sql::{Datetime, Thing},
+    sql::{Datetime, Thing, Id},
     Surreal,
 };
 
@@ -179,11 +178,11 @@ pub async fn ws_open_handler<E: std::error::Error + Send + Sync + 'static>(
                         let user_id_bytes: [u8; 20] = user_id_str.as_bytes().try_into().unwrap();
 
                         let ws_handler = move |ws: RouterifyWebSocket| async move {
-                            let i_am_using_user_id = user_id_bytes;
+                            let user_id = String::from_utf8(Vec::from(user_id_bytes)).unwrap();
                             let local_ws = WebSocket::new(ws);
                             let app = get_app().await;
                             let mut app = app.lock().await;
-                            let mut session = app.init_session(local_ws);
+                            let mut session = app.init_session(user_id, local_ws);
                             session.start().await;
                         };
 
