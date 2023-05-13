@@ -1,6 +1,7 @@
 use config::{WS_HOST, WS_PORT, WS_PATH};
 use eframe::web::AppRunnerRef;
 use wasm_bindgen::prelude::*;
+use web_sys::{window, UrlSearchParams};
 use ws::WebSocket;
 use log::Level;
 
@@ -46,8 +47,9 @@ pub async fn start_app(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsVal
 /// Call this once from the HTML.
 #[wasm_bindgen]
 pub async fn start_app_separate(canvas_id: &str) -> Result<WebHandle, wasm_bindgen::JsValue> {
+    let ticket = extract_ticket_id().expect("Ticket ID not provided");
     let web_options = eframe::WebOptions::default();
-    let ws_url = format!("ws://{}:{}{}", WS_HOST, WS_PORT, WS_PATH);
+    let ws_url = format!("ws://{}:{}{}?ticket={}", WS_HOST, WS_PORT, WS_PATH, ticket);
     let ws_res = WebSocket::connect(&ws_url).await;
     match ws_res {
         Ok(ws) => eframe::start_web(
@@ -59,4 +61,13 @@ pub async fn start_app_separate(canvas_id: &str) -> Result<WebHandle, wasm_bindg
         .map(|handle| WebHandle { handle }),
         Err(e) => Err(JsValue::from_str(&format!("{:?}", e))),
     }
+}
+
+fn extract_ticket_id() -> Option<String> {
+    let window = window().unwrap();
+    let document = window.document().unwrap();
+    let location = document.location().unwrap();
+    let search = location.search().unwrap();
+    let url_search_params = UrlSearchParams::new_with_str(&search).unwrap();
+    url_search_params.get("ticket")
 }

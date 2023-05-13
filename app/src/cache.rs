@@ -3,7 +3,7 @@ use std::{
     fmt::Debug,
     marker::PhantomData,
     path::PathBuf,
-    str::{from_utf8, Utf8Error}
+    str::{from_utf8, Utf8Error}, sync::Arc
 };
 
 use futures::StreamExt;
@@ -23,7 +23,7 @@ use tokio_tar::Archive;
 
 /// Cache that store contents of the oxd files
 pub struct Cache<SI: StorageId, SE: Debug, T: Connection, S: Storage<SE, SI>> {
-    db: Surreal<T>,
+    db: Arc<Surreal<T>>,
     storage: S,
     _phantom_se: PhantomData<SE>,
     _phantom_si: PhantomData<SI>,
@@ -41,7 +41,7 @@ pub enum CacheFileError<SE: Debug> {
 }
 
 impl<SI: StorageId, SE: Debug, T: Connection, S: Storage<SE, SI>> Cache<SI, SE, T, S> {
-    pub fn new(db: Surreal<T>, storage: S) -> Cache<SI, SE, T, S> {
+    pub fn new(db: Arc<Surreal<T>>, storage: S) -> Cache<SI, SE, T, S> {
         Cache {
             db,
             storage,

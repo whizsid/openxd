@@ -1,5 +1,5 @@
 use cache::{Cache, CacheFileError};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 use storage::{Storage, StorageId};
 use surrealdb::{Connection, Surreal};
 use tokio::io::AsyncBufRead;
@@ -15,12 +15,15 @@ pub mod storage;
 
 pub struct App<SI: StorageId, SE: Debug, D: Connection, S: Storage<SE, SI>> {
     cache: Cache<SI, SE, D, S>,
+    db: Arc<Surreal<D>>
 }
 
 impl<SI: StorageId, SE: Debug, D: Connection, S: Storage<SE, SI>> App<SI, SE, D, S> {
     pub fn new(db: Surreal<D>, storage: S) -> App<SI, SE, D, S> {
+        let rc_db = Arc::new(db);
         App {
-            cache: Cache::new(db, storage),
+            db: rc_db.clone(),
+            cache: Cache::new(rc_db, storage),
         }
     }
 
@@ -38,6 +41,11 @@ impl<SI: StorageId, SE: Debug, D: Connection, S: Storage<SE, SI>> App<SI, SE, D,
         internal_client: T,
     ) -> Session<E, T> {
         Session::new(internal_client)
+    }
+
+    /// Accessing the internal database connection
+    pub fn database(&self) -> Arc<Surreal<D>> {
+        self.db.clone()
     }
 }
 

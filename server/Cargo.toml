@@ -27,7 +27,7 @@ serde = {version="^1.0", features = ["derive"]}
 serde_json = "^1.0"
 
 [features]
-default = ["storage-fs", "db-ws"]
+default = ["storage-fs", "db-ws", "db-auth-root"]
 # Amazon S3 as the storage
 storage-s3 = []
 # File system as the storage
@@ -40,3 +40,9 @@ db-wss = ["surrealdb/protocol-ws", "surrealdb/rustls"]
 db-http = ["surrealdb/protocol-http"]
 # Database connection over http with TLS
 db-https = ["surrealdb/protocol-http", "surrealdb/rustls"]
+# Authenticate to DB as a root user
+db-auth-root = []
+# Authenticate to DB as a DB user
+db-auth-database = []
+# Authenticate to DB as a namespace user
+db-auth-namespace = []
