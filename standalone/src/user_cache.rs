@@ -1,26 +1,30 @@
+use std::sync::Arc;
+
+use app::external::{create_project_using_existing_file, CreateProjectUsingExistingFileError};
+use async_trait::async_trait;
+use surrealdb::{engine::local::Db, Surreal};
 use ui::cache::Cache as UICache;
 
-pub struct UserCache;
+use crate::fs::{FileSystemStorage, StorageError};
 
-#[derive(Debug)]
-pub enum UserCacheError {
-    PermissionDenied,
-    IoError,
+pub struct UserCache {
+    db: Arc<Surreal<Db>>,
+    storage: Arc<FileSystemStorage>,
 }
 
 impl UserCache {
-    pub fn new() -> UserCache {
-        UserCache
+    pub fn new(db: Arc<Surreal<Db>>, storage: Arc<FileSystemStorage>) -> UserCache {
+        UserCache { db, storage }
     }
 }
 
+#[async_trait]
 impl UICache for UserCache {
-    type Error = UserCacheError;
+    type Error = CreateProjectUsingExistingFileError<StorageError>;
 
-    fn cache_file<'async_trait>(self:std::sync::Arc<Self> ,buf:Vec<u8>) ->  core::pin::Pin<Box<dyn core::future::Future<Output = Result<String,Self::Error> > + core::marker::Send+'async_trait> >where Self:'async_trait {
-        let fut = async {
-            Ok(String::new())
-        };
-        Box::pin(fut)
+    async fn cache_file(self: Arc<Self>, buf: Vec<u8>) -> Result<String, Self::Error> {
+        let mut buf_reader: &[u8] = buf.as_slice();
+        let project = create_project_using_existing_file(self.db.clone(), self.storage.clone(), &mut buf_reader).await?;
+        Ok(project.id.to_string())
     }
 }

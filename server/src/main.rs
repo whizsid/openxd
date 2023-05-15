@@ -1,17 +1,16 @@
 use std::{
     convert::Infallible,
     net::{IpAddr, SocketAddr},
-    path::PathBuf,
     str::FromStr,
+    sync::Arc,
 };
 
-use app::{cache::CacheFileError, App};
-use config::{DB_NAME, DB_NAMESPACE, DB_PASSWORD, DB_URL, DB_USER, WS_HOST, WS_PATH, WS_PORT};
-use futures::{
-    future::{ok, Ready},
-    lock::Mutex,
-    TryStreamExt,
+use app::{
+    external::{create_project_using_existing_file, CreateProjectUsingExistingFileError},
+    App,
 };
+use config::{DB_NAME, DB_NAMESPACE, DB_PASSWORD, DB_URL, DB_USER, WS_HOST, WS_PATH, WS_PORT};
+use futures::{lock::Mutex, TryStreamExt};
 use hyper::{header::CONTENT_TYPE, Body, Request, Response, Server, StatusCode};
 use multer::Multipart;
 use querystring::querify;
@@ -19,7 +18,7 @@ use routerify::{Router, RouterService};
 use routerify_cors::enable_cors_all;
 use routerify_websocket::{upgrade_ws, WebSocket as RouterifyWebSocket};
 use serde::{Deserialize, Serialize};
-use storage::{StorageError, StorageImpl};
+use storage::StorageImpl;
 
 #[cfg(any(feature = "db-http", feature = "db-https"))]
 use surrealdb::engine::remote::http::Client as DbClient;
@@ -40,12 +39,13 @@ use surrealdb::opt::auth::Namespace as NamespaceAuth;
 #[cfg(feature = "db-auth-root")]
 use surrealdb::opt::auth::Root as RootAuth;
 use surrealdb::{
-    sql::{Datetime, Thing, Id},
+    sql::{Datetime, Id, Thing},
     Surreal,
 };
 
+use once_cell::sync::OnceCell;
 use serde_json::ser::to_string;
-use tokio::sync::OnceCell;
+use tokio::sync::OnceCell as TokioOnceCell;
 use tokio_util::io::StreamReader;
 use ws::WebSocket;
 
@@ -53,12 +53,16 @@ mod config;
 mod storage;
 mod ws;
 
-static APP: OnceCell<Mutex<App<PathBuf, StorageError, DbClient, StorageImpl>>> =
-    OnceCell::const_new();
+static STORAGE: OnceCell<Arc<StorageImpl>> = OnceCell::new();
 
-async fn get_app() -> &'static Mutex<App<PathBuf, StorageError, DbClient, StorageImpl>> {
-    APP.get_or_init(|| async {
-        let storage = StorageImpl;
+pub fn get_storage() -> &'static Arc<StorageImpl> {
+    STORAGE.get_or_init(|| Arc::new(StorageImpl))
+}
+
+static DB: TokioOnceCell<Arc<Surreal<DbClient>>> = TokioOnceCell::const_new();
+
+pub async fn get_db() -> &'static Arc<Surreal<DbClient>> {
+    DB.get_or_init(|| async {
         let db = Surreal::new::<DbConnection>(DB_URL).await.unwrap();
         db.use_ns(DB_NAMESPACE).use_db(DB_NAME).await.unwrap();
         #[cfg(feature = "db-auth-root")]
@@ -85,7 +89,17 @@ async fn get_app() -> &'static Mutex<App<PathBuf, StorageError, DbClient, Storag
         })
         .await
         .unwrap();
-        Mutex::new(App::new(db, storage))
+        Arc::new(db)
+    })
+    .await
+}
+
+static APP: TokioOnceCell<Mutex<App<DbClient>>> = TokioOnceCell::const_new();
+
+pub async fn get_app() -> &'static Mutex<App<DbClient>> {
+    APP.get_or_init(|| async {
+        let db = get_db().await;
+        Mutex::new(App::new(db.clone()))
     })
     .await
 }
@@ -182,7 +196,7 @@ pub async fn ws_open_handler<E: std::error::Error + Send + Sync + 'static>(
                             let local_ws = WebSocket::new(ws);
                             let app = get_app().await;
                             let mut app = app.lock().await;
-                            let mut session = app.init_session(user_id, local_ws);
+                            let mut session = app.create_session(user_id, local_ws).await.unwrap();
                             session.start().await;
                         };
 
@@ -248,13 +262,16 @@ pub async fn oxd_upload_handler<E: std::error::Error + Send + Sync>(
                 let stream_reader = StreamReader::new(
                     field.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
                 );
-                let app = get_app().await;
-                let app = app.lock().await;
-                let session_id_res = app.create_session_with_file(stream_reader).await;
-                return match session_id_res {
-                    Ok(session_id) => {
-                        let session_id_str = session_id.to_string();
-                        let success_response = OxdUploadSuccessResponse::new(session_id_str);
+                let project_res = create_project_using_existing_file(
+                    get_db().await.clone(),
+                    get_storage().clone(),
+                    stream_reader,
+                )
+                .await;
+                return match project_res {
+                    Ok(project) => {
+                        let project_id_str = project.id.to_string();
+                        let success_response = OxdUploadSuccessResponse::new(project_id_str);
                         let json_content = to_string(&success_response).unwrap();
                         Ok(Response::builder()
                             .status(StatusCode::CREATED)
@@ -262,15 +279,15 @@ pub async fn oxd_upload_handler<E: std::error::Error + Send + Sync>(
                             .unwrap())
                     }
                     Err(err) => match err {
-                        CacheFileError::Io(_) => Ok(Response::builder()
+                        CreateProjectUsingExistingFileError::Io(_) => Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .body(Body::from("IO ERROR"))
                             .unwrap()),
-                        CacheFileError::Db(_) => Ok(Response::builder()
+                        CreateProjectUsingExistingFileError::Db(_) => Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .body(Body::from("DB ERROR"))
                             .unwrap()),
-                        CacheFileError::Storage(_) => Ok(Response::builder()
+                        CreateProjectUsingExistingFileError::Storage(_) => Ok(Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .body(Body::from("STORAGE ERROR"))
                             .unwrap()),

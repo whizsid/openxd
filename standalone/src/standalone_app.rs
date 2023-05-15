@@ -1,16 +1,34 @@
-use ui::ui::Ui;
-use eframe::{CreationContext, App};
+use std::sync::Arc;
 
-use crate::{bichannel::{BiChannelError, BiChannel}, user_cache::{UserCacheError, UserCache}};
+use app::external::CreateProjectUsingExistingFileError;
+use eframe::{App, CreationContext};
+use surrealdb::{engine::local::Db, Surreal};
+use ui::ui::Ui;
+
+use crate::{
+    bichannel::{BiChannel, BiChannelError},
+    fs::{FileSystemStorage, StorageError},
+    user_cache::UserCache,
+};
 
 pub struct StandaloneApp {
-    ui: Ui<BiChannelError, UserCacheError, BiChannel<Vec<u8>, Vec<u8>>, UserCache>
+    ui: Ui<
+        BiChannelError,
+        CreateProjectUsingExistingFileError<StorageError>,
+        BiChannel<Vec<u8>, Vec<u8>>,
+        UserCache,
+    >,
 }
 
 impl StandaloneApp {
-    pub fn new(_cc: &CreationContext<'_>, internal: BiChannel<Vec<u8>, Vec<u8>>) -> StandaloneApp {
+    pub fn new(
+        _cc: &CreationContext<'_>,
+        internal: BiChannel<Vec<u8>, Vec<u8>>,
+        db: Arc<Surreal<Db>>,
+        storage: Arc<FileSystemStorage>,
+    ) -> StandaloneApp {
         StandaloneApp {
-            ui: Ui::new(internal, UserCache::new())
+            ui: Ui::new(internal, UserCache::new(db, storage)),
         }
     }
 }
