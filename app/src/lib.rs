@@ -9,8 +9,12 @@ mod messages;
 pub mod model;
 pub mod oxd;
 pub mod storage;
+pub mod action;
 
 use model::Session as SessionModel;
+
+pub static OXD_VERSION: &str = "0.0.1";
+pub static DEFAULT_BRANCH: &str = "main";
 
 pub struct App<D: Connection> {
     db: Arc<Surreal<D>>,

@@ -8,7 +8,7 @@ use log::Level;
 mod app;
 mod config;
 mod ws;
-mod cache;
+mod rest_api;
 
 #[wasm_bindgen]
 pub struct WebHandle {

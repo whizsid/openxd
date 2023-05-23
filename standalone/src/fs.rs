@@ -12,9 +12,10 @@ pub struct FileSystemStorage {
     data_dir: PathBuf,
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum StorageError {
-    Io(std::io::Error),
+    #[error("failed to read/write some data")]
+    Io(#[from] std::io::Error),
 }
 
 impl FileSystemStorage {

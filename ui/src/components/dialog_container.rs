@@ -2,7 +2,7 @@ use std::{fmt::Debug, rc::Rc};
 
 use egui::{pos2, Align, Area, Frame, Layout, Margin};
 
-use crate::{client::ClientTransport, cache::Cache, scopes::ApplicationScope};
+use crate::{client::ClientTransport, external::External, scopes::ApplicationScope};
 
 use super::TopLevelUIComponent;
 
@@ -12,19 +12,19 @@ const DIALOG_MARGIN_Y: f32 = 8.0;
 
 pub struct DialogContainerComponent<
     TE: Debug + Send,
-    CE: Debug,
+    EE: Debug,
     T: ClientTransport<TE>,
-    C: Cache<Error = CE>,
+    E: External<Error = EE>,
 > {
-    app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
+    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
 }
 
-impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>>
-    DialogContainerComponent<TE, CE, T, C>
+impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
+    DialogContainerComponent<TE, EE, T, E>
 {
     pub fn new(
-        app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
-    ) -> DialogContainerComponent<TE, CE, T, C> {
+        app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+    ) -> DialogContainerComponent<TE, EE, T, E> {
         DialogContainerComponent { app_scope }
     }
 
@@ -65,8 +65,8 @@ impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>>
     }
 }
 
-impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>>
-    TopLevelUIComponent for DialogContainerComponent<TE, CE, T, C>
+impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
+    TopLevelUIComponent for DialogContainerComponent<TE, EE, T, E>
 {
     fn draw(&mut self, ctx: &egui::Context) {
         let win_max = ctx.screen_rect().max;

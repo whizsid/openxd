@@ -1,35 +1,35 @@
 use std::{fmt::Debug, rc::Rc};
 
-use crate::{client::ClientTransport, cache::Cache, scopes::ApplicationScope};
+use crate::{client::ClientTransport, external::External, scopes::ApplicationScope};
 
 use super::UIComponent;
 
 pub struct StatusBarComponent<
     TE: Debug + Send,
-    CE: Debug,
+    EE: Debug,
     T: ClientTransport<TE>,
-    C: Cache<Error = CE>,
+    E: External<Error = EE>,
 > {
-    app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
+    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
 }
 
 impl <
     TE: Debug + Send,
-    CE: Debug,
+    EE: Debug,
     T: ClientTransport<TE>,
-    C: Cache<Error = CE>,
-> StatusBarComponent<TE, CE, T, C> {
-    pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> StatusBarComponent<TE, CE, T, C> {
+    E: External<Error = EE>,
+> StatusBarComponent<TE, EE, T, E> {
+    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>) -> StatusBarComponent<TE, EE, T, E> {
         StatusBarComponent { app_scope }
     }
 }
 
 impl <
     TE: Debug + Send,
-    CE: Debug,
+    EE: Debug,
     T: ClientTransport<TE>,
-    C: Cache<Error = CE>,
-> UIComponent for StatusBarComponent<TE, CE, T, C> {
+    E: External<Error = EE>,
+> UIComponent for StatusBarComponent<TE, EE, T, E> {
     fn draw(&mut self, ui: &mut egui::Ui) {
         let txt = self.app_scope.state().status_message();
 

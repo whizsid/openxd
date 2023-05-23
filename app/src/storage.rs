@@ -8,14 +8,15 @@ use std::{fmt::Debug, hash::Hash};
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::AsyncRead;
+use std::error::Error as StdError;
 
-pub trait StorageId: Hash + PartialEq + Eq + Serialize + DeserializeOwned + Sync + Send {}
+pub trait StorageId: Hash + PartialEq + Eq + Serialize + DeserializeOwned + Sync + Send + Clone {}
 
-impl<T> StorageId for T where T: Hash + PartialEq + Eq + Serialize + DeserializeOwned + Sync + Send {}
+impl<T> StorageId for T where T: Hash + PartialEq + Eq + Serialize + DeserializeOwned + Sync + Send + Clone {}
 
 /// Storage interface to interact with file system
 #[async_trait]
-pub trait Storage<E: Debug, ID: StorageId> {
+pub trait Storage<E: Debug + StdError, ID: StorageId> {
     type Read: AsyncRead + Unpin;
     /// Saving a file to storage
     ///

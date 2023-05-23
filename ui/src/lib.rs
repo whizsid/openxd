@@ -17,5 +17,5 @@ pub mod commands;
 pub mod scopes;
 
 // Infrastructure
-pub mod cache;
+pub mod external;
 pub mod client;

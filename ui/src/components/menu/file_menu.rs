@@ -4,7 +4,7 @@ use egui::Ui;
 
 use crate::{
     client::ClientTransport, commands::file::open_file::FileOpenCommand, components::UIComponent,
-    cache::Cache, scopes::ApplicationScope,
+    external::External, scopes::ApplicationScope,
 };
 
 pub enum FileMenuComponentEvent {
@@ -13,21 +13,21 @@ pub enum FileMenuComponentEvent {
 
 pub struct FileMenuComponent<
     TE: Debug + Send + 'static,
-    CE: Debug + 'static,
+    EE: Debug + 'static,
     T: ClientTransport<TE>,
-    C: Cache<Error = CE>,
+    E: External<Error = EE>,
 > {
-    app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
+    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
 }
 
 impl<
         TE: Debug + Send + 'static,
-        CE: Debug + 'static,
+        EE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: Cache<Error = CE>,
-    > FileMenuComponent<TE, CE, T, C>
+        E: External<Error = EE>,
+    > FileMenuComponent<TE, EE, T, E>
 {
-    pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> Self {
+    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>) -> Self {
         FileMenuComponent { app_scope }
     }
 
@@ -43,10 +43,10 @@ impl<
 
 impl<
         TE: Debug + Send + 'static,
-        CE: Debug + 'static,
+        EE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: Cache<Error = CE>,
-    > UIComponent for FileMenuComponent<TE, CE, T, C>
+        E: External<Error = EE>,
+    > UIComponent for FileMenuComponent<TE, EE, T, E>
 {
     fn draw(&mut self, ui: &mut Ui) {
         ui.menu_button("File", |ui| {

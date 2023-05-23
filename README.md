@@ -38,5 +38,5 @@ frontend
 ## Status
 
 - [x] Make standalone application, web server, web frontend by sharing same source code.
-- [ ] 'Open File' implementation.
-- [ ] `Create File` implementation.
+- [x] 'Open File' implementation.
+- [ ] `New` implementation.

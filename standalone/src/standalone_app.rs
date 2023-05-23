@@ -8,15 +8,15 @@ use ui::ui::Ui;
 use crate::{
     bichannel::{BiChannel, BiChannelError},
     fs::{FileSystemStorage, StorageError},
-    user_cache::UserCache,
+    mock_api::{MockApi, MockApiError},
 };
 
 pub struct StandaloneApp {
     ui: Ui<
         BiChannelError,
-        CreateProjectUsingExistingFileError<StorageError>,
+        MockApiError<StorageError>,
         BiChannel<Vec<u8>, Vec<u8>>,
-        UserCache,
+        MockApi,
     >,
 }
 
@@ -28,7 +28,7 @@ impl StandaloneApp {
         storage: Arc<FileSystemStorage>,
     ) -> StandaloneApp {
         StandaloneApp {
-            ui: Ui::new(internal, UserCache::new(db, storage)),
+            ui: Ui::new(internal, MockApi::new(db, storage)),
         }
     }
 }

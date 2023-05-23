@@ -12,9 +12,10 @@ use crate::config::STORAGE_FS_ROOT;
 
 pub struct FileSystemStorage;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum StorageError {
-    Io(std::io::Error),
+    #[error("Failed to read or write some data")]
+    Io(#[from] std::io::Error),
 }
 
 #[async_trait]
@@ -35,17 +36,15 @@ impl Storage<StorageError, PathBuf> for FileSystemStorage {
             .join(namespace)
             .join(format!("{}.{}", file_name, ext));
         let mut file = File::open(path.clone())
-            .await
-            .map_err(|e| StorageError::Io(e))?;
+            .await?;
         copy(reader, &mut file)
-            .await
-            .map_err(|e| StorageError::Io(e))?;
+            .await?;
         Ok(path.to_path_buf())
     }
 
     /// Retrieving the saved file from the storage
     async fn get(&self, key: PathBuf) -> Result<Self::Read, StorageError> {
-        let file = File::open(key).await.map_err(|e| StorageError::Io(e))?;
+        let file = File::open(key).await?;
         Ok(file)
     }
 

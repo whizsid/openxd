@@ -7,29 +7,29 @@ use std::{fmt::Debug, marker::PhantomData, sync::Arc, rc::Rc, cell::{RefCell, Re
 
 use futures::lock::Mutex;
 
-use crate::{client::{ClientTransport, Client}, cache::Cache, commands::{Executor, Command}, state::AppState};
+use crate::{client::{ClientTransport, Client}, external::External, commands::{Executor, Command}, state::AppState};
 
 /// Application wide scope
-pub struct ApplicationScope<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>> {
+pub struct ApplicationScope<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> {
     client: Arc<Mutex<Client<TE, T>>>,
-    remote_cache: Arc<C>,
+    external_client: Arc<E>,
     command_executor: Rc<RefCell<Executor>>,
     state: Rc<RefCell<AppState>>,
     _phantom: PhantomData<TE>
 }
 
-impl <TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>> ApplicationScope<TE, CE, T, C> {
-    pub fn new(transport: T ,remote_cache: C) -> ApplicationScope<TE, CE, T, C> {
+impl <TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> ApplicationScope<TE, EE, T, E> {
+    pub fn new(transport: T ,external_client: E) -> ApplicationScope<TE, EE, T, E> {
         let command_executor = Rc::new(RefCell::new(Executor::new()));
         let arc_client = Arc::new(Mutex::new(Client::new(transport)));
-        let arc_remote_cache = Arc::new(remote_cache);
+        let arc_external_client = Arc::new(external_client);
         let app_state = Rc::new(RefCell::new(AppState::new()));
 
         ApplicationScope {
             command_executor,
             state: app_state,
             client: arc_client,
-            remote_cache: arc_remote_cache,
+            external_client: arc_external_client,
             _phantom: PhantomData
         }
     }
@@ -55,8 +55,8 @@ impl <TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>>
     }
 
     /// Getting a reference for the remote cache
-    pub fn remote_cache(&self) -> Arc<C> {
-        self.remote_cache.clone()
+    pub fn external_client(&self) -> Arc<E> {
+        self.external_client.clone()
     }
     
     /// Getting a reference for the client

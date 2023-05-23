@@ -1,15 +1,15 @@
 use ui::ui::Ui;
 use eframe::CreationContext;
 
-use crate::{ws::{WebSocket, WebSocketError}, cache::{RemoteCache, RemoteCacheError}};
+use crate::{ws::{WebSocket, WebSocketError}, rest_api::{RestApi, RestApiError}};
 
 pub struct WebApp {
-    ui: Ui<WebSocketError, RemoteCacheError, WebSocket, RemoteCache>
+    ui: Ui<WebSocketError, RestApiError, WebSocket, RestApi>
 }
 
 impl WebApp {
     pub fn new(cc: &CreationContext<'_>, ws: WebSocket) -> WebApp {
-        WebApp { ui:  Ui::new(ws, RemoteCache::new()) }
+        WebApp { ui:  Ui::new(ws, RestApi::new()) }
     }
 }
 

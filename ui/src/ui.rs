@@ -12,33 +12,33 @@ use crate::components::dialog_container::DialogContainerComponent;
 use crate::components::menu::MenuComponent;
 use crate::components::status_bar::StatusBarComponent;
 use crate::components::{UIComponent, TopLevelUIComponent};
-use crate::cache::Cache;
+use crate::external::External;
 use crate::scopes::ApplicationScope;
 
 
 pub struct Ui<
     TE: Debug + Send + 'static,
-    CE: Debug + 'static,
+    EE: Debug + 'static,
     T: ClientTransport<TE>,
-    C: Cache<Error = CE>,
+    E: External<Error = EE>,
 > {
-    scope: Rc<ApplicationScope<TE, CE, T, C>>,
+    scope: Rc<ApplicationScope<TE, EE, T, E>>,
     // Componentes
-    menu_component: MenuComponent<TE, CE, T, C>,
-    status_bar_component: StatusBarComponent<TE, CE, T, C>,
-    dialog_container_component: DialogContainerComponent<TE, CE, T, C>
+    menu_component: MenuComponent<TE, EE, T, E>,
+    status_bar_component: StatusBarComponent<TE, EE, T, E>,
+    dialog_container_component: DialogContainerComponent<TE, EE, T, E>
 }
 
 impl<
         TE: Debug + Send + 'static,
-        CE: Debug + 'static,
+        EE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: Cache<Error = CE>,
-    > Ui<TE, CE, T, C>
+        E: External<Error = EE>,
+    > Ui<TE, EE, T, E>
 {
     /// Creating the main UI by passing external interfaces
-    pub fn new(transport: T, remote_cache: C) -> Self {
-        let app_scope = Rc::new(ApplicationScope::new(transport, remote_cache));
+    pub fn new(transport: T, external_client: E) -> Self {
+        let app_scope = Rc::new(ApplicationScope::new(transport, external_client));
 
         Self {
             scope: app_scope.clone(),

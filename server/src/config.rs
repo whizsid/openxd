@@ -12,3 +12,5 @@ pub const DB_PASSWORD: &str = dotenv!("DB_PASSWORD");
 
 #[cfg(feature="storage-fs")]
 pub const STORAGE_FS_ROOT: &str = dotenv!("STORAGE_FS_ROOT");
+
+pub const JWT_SECRET: &str = dotenv!("JWT_SECRET");

@@ -3,29 +3,29 @@ use std::{fmt::Debug, rc::Rc};
 use poll_promise::Promise;
 
 use crate::{
-    client::ClientTransport, commands::Command, cache::Cache, scopes::ApplicationScope,
+    client::ClientTransport, commands::Command, external::External, scopes::ApplicationScope,
 };
 
 pub struct FileOpenCommand<
     TE: Debug + Send + 'static,
-    CE: Debug + 'static,
+    EE: Debug + 'static,
     T: ClientTransport<TE>,
-    C: Cache<Error = CE>,
+    E: External<Error = EE>,
 > {
-    app_scope: Rc<ApplicationScope<TE, CE, T, C>>,
-    file_dialog_promise: Option<Promise<Option<Vec<u8>>>>,
+    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+    file_dialog_promise: Option<Promise<Option<(Vec<u8>, String)>>>,
     opened_file_cache_promise: Option<Promise<Result<String, String>>>,
     file_open_promise: Option<Promise<Result<(), String>>>,
 }
 
 impl<
         TE: Debug + Send + 'static,
-        CE: Debug + 'static,
+        EE: Debug + 'static,
         T: ClientTransport<TE>,
-        C: Cache<Error = CE>,
-    > FileOpenCommand<TE, CE, T, C>
+        E: External<Error = EE>,
+    > FileOpenCommand<TE, EE, T, E>
 {
-    pub fn new(app_scope: Rc<ApplicationScope<TE, CE, T, C>>) -> Self {
+    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>) -> Self {
         let mut state_mut = app_scope.state_mut();
         state_mut.disable_main_ui();
         state_mut.set_status_message(String::from("Select the file"));
@@ -37,7 +37,7 @@ impl<
                 .pick_file()
                 .await;
             if let Some(f) = file {
-                Some(f.read().await)
+                Some((f.read().await, f.file_name()))
             } else {
                 None
             }
@@ -58,16 +58,16 @@ impl<
         drop(state_mut);
     }
 
-    pub fn cache_opened_file(&mut self, buf: Vec<u8>) {
+    pub fn cache_opened_file(&mut self, buf: Vec<u8>, file_name: String) {
         self.app_scope
             .state_mut()
             .set_status_message("Caching the opened file");
-        let cache = self.app_scope.remote_cache();
+        let external_client = self.app_scope.external_client();
         let _ = self
             .opened_file_cache_promise
             .insert(Promise::spawn_async(async move {
-                let cached_res = cache.cache_file(buf).await;
-                cached_res.map_err(|e| format!("{:?}", e))
+                let external_res = external_client.create_project_using_existing_file(buf, file_name).await;
+                external_res.map_err(|e| format!("{:?}", e))
             }));
     }
 
@@ -124,8 +124,8 @@ impl<
     }
 }
 
-impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>> Command
-    for FileOpenCommand<TE, CE, T, C>
+impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> Command
+    for FileOpenCommand<TE, EE, T, E>
 {
     fn update(&mut self) -> bool {
         let mut done = false;
@@ -133,8 +133,8 @@ impl<TE: Debug + Send, CE: Debug, T: ClientTransport<TE>, C: Cache<Error = CE>> 
             if let Some(buf_opt) = file_dialog_promise.ready() {
                 self.file_dialog_promise = None;
 
-                if let Some(buf) = buf_opt {
-                    self.cache_opened_file(buf.clone());
+                if let Some((buf, file_name)) = buf_opt {
+                    self.cache_opened_file(buf.clone(), file_name.clone());
                 } else {
                     self.file_dialog_cancel();
                 }
