@@ -15,10 +15,22 @@ crate-type = ["cdylib"]
 wasm-bindgen = "^0.2"
 wasm-bindgen-futures = "^0.4"
 js-sys = "^0.3"
-web-sys = {version = "^0.3", features = ["FormData", "Blob", "XmlHttpRequest", "Window", "Document", "UrlSearchParams", "Location", "Storage"]}
+web-sys = {version = "^0.3", features = [
+    "FormData",
+    "Blob",
+    "Window",
+    "Document",
+    "UrlSearchParams",
+    "Location",
+    "Storage",
+    "Request",
+    "RequestInit",
+    "Response",
+    "Headers"
+    ]}
 tracing-wasm = "^0.2"
 console_error_panic_hook = "^0.1"
-eframe = "^0.21"
+eframe = "^0.22"
 ui = { path = "../ui" }
 ws_stream_wasm = "^0.7"
 futures = "^0.3"

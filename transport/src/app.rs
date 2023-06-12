@@ -2,31 +2,37 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ApplicationMessage {
-    FileOpened,
-    Error(String)
+    Error(String),
+    TabCreated(TabCreatedMessage),
+    Pong
 }
 
-pub struct FileOpenedMessage;
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TabCreatedMessage {
+    pub tab_name: String,
+    pub tab_id: String,
+}
 
-impl FileOpenedMessage {
-    pub fn new() -> FileOpenedMessage {
-        FileOpenedMessage
+impl TabCreatedMessage {
+    pub fn new(tab_name: String, tab_id: String) -> TabCreatedMessage {
+        TabCreatedMessage { tab_name, tab_id }
     }
 }
 
-impl TryFrom<ApplicationMessage> for FileOpenedMessage {
+impl TryFrom<ApplicationMessage> for TabCreatedMessage {
     type Error = ();
+
     fn try_from(value: ApplicationMessage) -> Result<Self, Self::Error> {
         match value {
-            ApplicationMessage::FileOpened=> Ok(FileOpenedMessage),
+            ApplicationMessage::TabCreated(inner) => Ok(inner),
             _ => Err(())
         }
     }
 }
 
-impl Into<ApplicationMessage> for FileOpenedMessage{
+impl Into<ApplicationMessage> for TabCreatedMessage {
     fn into(self) -> ApplicationMessage {
-        ApplicationMessage::FileOpened
+        ApplicationMessage::TabCreated(self)
     }
 }
 
@@ -51,5 +57,29 @@ impl TryFrom<ApplicationMessage> for ErrorMessage {
 impl Into<ApplicationMessage> for ErrorMessage {
     fn into(self) -> ApplicationMessage {
         ApplicationMessage::Error(self.0)
+    }
+}
+
+pub struct PongMessage;
+
+impl PongMessage {
+    pub fn new() -> PongMessage {
+        PongMessage
+    }
+}
+
+impl TryFrom<ApplicationMessage> for PongMessage {
+    type Error = ();
+    fn try_from(value: ApplicationMessage) -> Result<Self, Self::Error> {
+        match value {
+            ApplicationMessage::Pong => Ok(PongMessage::new()),
+            _ => Err(())
+        }
+    }
+}
+
+impl Into<ApplicationMessage> for PongMessage {
+    fn into(self) -> ApplicationMessage {
+        ApplicationMessage::Pong
     }
 }

@@ -21,6 +21,7 @@ use tokio::spawn;
 use surrealdb::engine::local::Mem as DbConnection;
 #[cfg(feature="db-rocksdb")]
 use surrealdb::engine::local::RocksDb as DbConnection;
+use transport::ReceiveError;
 
 #[tokio::main]
 async fn main() {
@@ -39,13 +40,32 @@ async fn main() {
 
     let db = Arc::new(Surreal::new::<DbConnection>(db_path).await.unwrap());
 
+    db.use_ns("default").use_db("default").await.unwrap();
+
     let app = Arc::new(Mutex::new(App::new(db.clone())));
     let (uichannel, appchannel) = BiChannel::<Vec<u8>, Vec<u8>>::new::<Vec<u8>, Vec<u8>>();
+    let fs_el = fs.clone();
     spawn(async move {
         let app = app.clone();
         let mut app_locked = app.lock().await;
-        let mut session = app_locked.create_session(String::new(), appchannel).await.unwrap();
-        session.start().await;
+        let mut session = app_locked.create_session(String::from("currentuser"), appchannel, fs_el).await.unwrap();
+
+        loop {
+            let message = session.receive_message().await;
+            match message {
+                Ok(message) => {
+                    session.handle_message(message).await;
+                }
+                Err(e) => match e {
+                    ReceiveError::Terminated => {
+                        session.close().await;
+                        break;
+                    }
+                    _ => {}
+                },
+            }
+        }
+
     });
     let native_options = NativeOptions::default();
     run_native(

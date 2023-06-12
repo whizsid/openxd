@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use app::external::CreateProjectUsingExistingFileError;
 use eframe::{App, CreationContext};
 use surrealdb::{engine::local::Db, Surreal};
 use ui::ui::Ui;

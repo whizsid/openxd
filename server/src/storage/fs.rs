@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use app::storage::Storage;
+use app::storage::{Storage, StorageObjInfo};
 use async_trait::async_trait;
 use tokio::{
     fs::{remove_file, File},
@@ -51,5 +51,38 @@ impl Storage<StorageError, PathBuf> for FileSystemStorage {
     /// Removing a saved file
     async fn delete(&self, key: PathBuf) -> Result<(), StorageError> {
         remove_file(key).await.map_err(|e| StorageError::Io(e))
+    }
+
+    /// Retrieve the information of a storage object
+    async fn info(&self, key: PathBuf) -> Result<StorageObjInfo, StorageError> {
+        let mut ext_opt: Option<String> = None;
+        if let Some(ext) = key.extension() {
+            if let Some(ext_str) = ext.to_str() {
+                ext_opt = Some(String::from(ext_str));
+            }
+        }
+        Ok(StorageObjInfo {
+            ext: ext_opt
+        })
+    }
+
+    /// Duplicating a storage object
+    async fn duplicate(&self, key: PathBuf) -> Result<PathBuf, StorageError> {
+        let ext = key.extension();
+        let file_name = if let Some(ext) = ext {
+            if let Some(ext) = ext.to_str() {
+                format!("{}.{}", Uuid::new_v4(), ext)
+            } else {
+                Uuid::new_v4().to_string()
+            }
+        } else {
+            Uuid::new_v4().to_string()
+        };
+        let mut new_path = key.clone();
+        new_path.set_file_name(file_name);
+
+        tokio::fs::copy(key, new_path.clone()).await?;
+
+        Ok(new_path)
     }
 }

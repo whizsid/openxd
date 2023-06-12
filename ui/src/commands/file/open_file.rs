@@ -1,6 +1,7 @@
 use std::{fmt::Debug, rc::Rc};
 
 use poll_promise::Promise;
+use transport::app::TabCreatedMessage;
 
 use crate::{
     client::ClientTransport, commands::Command, external::External, scopes::ApplicationScope,
@@ -15,7 +16,7 @@ pub struct FileOpenCommand<
     app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
     file_dialog_promise: Option<Promise<Option<(Vec<u8>, String)>>>,
     opened_file_cache_promise: Option<Promise<Result<String, String>>>,
-    file_open_promise: Option<Promise<Result<(), String>>>,
+    file_open_promise: Option<Promise<Result<TabCreatedMessage, String>>>,
 }
 
 impl<
@@ -47,7 +48,7 @@ impl<
             app_scope,
             file_dialog_promise: Some(file_dialog_promise),
             opened_file_cache_promise: None::<Promise<Result<String, String>>>,
-            file_open_promise: None::<Promise<Result<(), String>>>,
+            file_open_promise: None::<Promise<Result<TabCreatedMessage, String>>>,
         }
     }
 
@@ -97,14 +98,16 @@ impl<
                 match res {
                     Err(e) => Err(format!("{:?}", e)),
                     Ok(res) => match res.into() {
-                        Ok(_opened_message) => Ok(()),
+                        Ok(tab_created_message) => {
+                            Ok(tab_created_message)
+                        },
                         Err(server_err) => Err(format!("Remote: {:?}", server_err)),
                     },
                 }
             }));
     }
 
-    pub fn file_opened(&mut self) {
+    pub fn file_opened(&mut self, tab_created_message: TabCreatedMessage) {
         let mut state_mut = self.app_scope.state_mut();
         state_mut.enable_main_ui();
         state_mut.clear_status_message();
@@ -166,8 +169,8 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
                 self.file_open_promise = None;
 
                 match file_opened_res {
-                    Ok(_) => {
-                        self.file_opened();
+                    Ok(tab_created_message) => {
+                        self.file_opened(tab_created_message.clone());
                         done = true;
                     }
                     Err(file_open_err) => {

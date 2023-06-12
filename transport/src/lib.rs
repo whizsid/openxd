@@ -15,6 +15,7 @@ pub enum SendError<E: Debug> {
 #[derive(Debug)]
 pub enum ReceiveError {
     Deserialize(BincodeError),
+    Terminated,
 }
 
 #[derive(Debug)]
@@ -43,6 +44,7 @@ pub struct Client<
 > {
     internal: T,
     pending: Vec<I>,
+    terminated: bool,
     _out: PhantomData<O>,
 }
 
@@ -58,6 +60,7 @@ impl<
             internal,
             pending: Vec::new(),
             _out: PhantomData,
+            terminated: false,
         }
     }
 
@@ -71,6 +74,20 @@ impl<
         Ok(response)
     }
 
+    /// Receive any incoming message without converting or blocking
+    pub async fn receive_raw(&mut self) -> Result<I, ReceiveError> {
+        let response_message_opt = self.internal.next().await;
+        if let Some(bin_message) = response_message_opt {
+            match from_bin::<I>(&bin_message) {
+                Ok(response_message) => Ok(response_message),
+                Err(e) => Err(ReceiveError::Deserialize(*e)),
+            }
+        } else {
+            self.terminated = true;
+            Err(ReceiveError::Terminated)
+        }
+    }
+
     pub async fn receive<IT: TryFrom<I, Error = ()>>(&mut self) -> Result<IT, ReceiveError> {
         for (i, pending_message) in self.pending.iter().enumerate() {
             if let Ok(converted_message) = IT::try_from(pending_message.clone()) {
@@ -79,21 +96,17 @@ impl<
             }
         }
 
+        if self.terminated {
+            return Err(ReceiveError::Terminated);
+        }
+
         loop {
-            let response_message_opt = self.internal.next().await;
-            if let Some(bin_message) = response_message_opt {
-                match from_bin::<I>(&bin_message) {
-                    Ok(response_message) => {
-                        if let Ok(converted_message) = IT::try_from(response_message.clone()) {
-                            return Ok(converted_message);
-                        } else {
-                            self.pending.push(response_message);
-                        }
-                    }
-                    Err(e) => {
-                        return Err(ReceiveError::Deserialize(*e));
-                    }
-                }
+            let response_message = self.receive_raw().await?;
+
+            if let Ok(converted_message) = IT::try_from(response_message.clone()) {
+                return Ok(converted_message);
+            } else {
+                self.pending.push(response_message);
             }
         }
     }

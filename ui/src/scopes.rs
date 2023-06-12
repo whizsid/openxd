@@ -7,7 +7,7 @@ use std::{fmt::Debug, marker::PhantomData, sync::Arc, rc::Rc, cell::{RefCell, Re
 
 use futures::lock::Mutex;
 
-use crate::{client::{ClientTransport, Client}, external::External, commands::{Executor, Command}, state::AppState};
+use crate::{client::{ClientTransport, Client}, external::External, commands::{Executor, Command}, state::{AppState, CreateProjectWindowState}};
 
 /// Application wide scope
 pub struct ApplicationScope<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> {
@@ -71,4 +71,26 @@ impl <TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = E
     pub fn update_cmd_executor(&self) {
         self.command_executor.borrow_mut().update();
     }
+}
+
+pub struct CreateProjectWindowScope <TE: Debug + Send, T: ClientTransport<TE> > {
+    client: Arc<Mutex<Client<TE, T>>>,
+    state: Rc<RefCell<CreateProjectWindowState>>
+}
+
+impl <TE: Debug + Send, T: ClientTransport<TE>> CreateProjectWindowScope<TE, T> {
+    pub fn new(client: Arc<Mutex<Client<TE, T>>> ) -> CreateProjectWindowScope<TE, T> {
+        CreateProjectWindowScope { client , state: Rc::new(RefCell::new( CreateProjectWindowState::new())) }
+    }
+
+    /// Getter for a non mutable reference to application wide state
+    pub fn state(&self) -> Ref<CreateProjectWindowState> {
+        self.state.borrow()
+    }
+
+    /// Getter for a mutable reference to application wide state
+    pub fn state_mut(&self) -> RefMut<CreateProjectWindowState> {
+        self.state.borrow_mut()
+    }
+
 }

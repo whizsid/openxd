@@ -2,28 +2,34 @@ use std::{
     collections::BTreeMap,
     fmt::Debug,
     net::{IpAddr, SocketAddr},
+    pin::Pin,
     str::FromStr,
     sync::Arc,
+    task::{Context, Poll},
 };
 
 use app::{
-    external::{create_project_using_existing_file, CreateProjectUsingExistingFileError},
+    external::{
+        create_project_using_existing_file, export_snapshot, get_current_tab_snapshot_id,
+        CreateProjectUsingExistingFileError, GetCurrentTabSnapshotError,
+    },
     App,
 };
 use config::{
     DB_NAME, DB_NAMESPACE, DB_PASSWORD, DB_URL, DB_USER, JWT_SECRET, WS_HOST, WS_PATH, WS_PORT,
 };
-use error::{AuthError, CreateProjectError, Error, WebSocketOpenError};
-use futures::{lock::Mutex, TryStreamExt};
+use error::{AuthError, CreateProjectError, Error, SnapshotDownloadError, WebSocketOpenError};
+use futures::{lock::Mutex, ready, TryStreamExt};
 use hmac::{Hmac, Mac};
 use hyper::{header::CONTENT_TYPE, Body, Request, Response, Server, StatusCode};
 use jwt::VerifyWithKey;
+use model::{SnapshotDownload, Ticket};
 use multer::Multipart;
 use querystring::querify;
-use routerify::{prelude::RequestExt, Middleware, Router, RouterService, RouteError};
+use routerify::{prelude::RequestExt, Middleware, RouteError, Router, RouterService};
 use routerify_cors::enable_cors_all;
 use routerify_websocket::{upgrade_ws, WebSocket as RouterifyWebSocket};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sha2::Sha256;
 use storage::{StorageError, StorageImpl};
 
@@ -45,19 +51,18 @@ use surrealdb::opt::auth::Database as DatabaseAuth;
 use surrealdb::opt::auth::Namespace as NamespaceAuth;
 #[cfg(feature = "db-auth-root")]
 use surrealdb::opt::auth::Root as RootAuth;
-use surrealdb::{
-    sql::{Datetime, Id, Thing},
-    Surreal,
-};
+use surrealdb::Surreal;
 
 use once_cell::sync::OnceCell;
 use serde_json::ser::to_string;
-use tokio::sync::OnceCell as TokioOnceCell;
+use tokio::{io::AsyncWrite, sync::OnceCell as TokioOnceCell};
 use tokio_util::io::StreamReader;
+use transport::ReceiveError;
 use ws::WebSocket;
 
 mod config;
 mod error;
+mod model;
 mod storage;
 mod ws;
 
@@ -136,8 +141,13 @@ fn router() -> Router<Body, Error<StorageError>> {
         // It will accept websocket connections at `/ws` path with GET method type.
         .get(WS_PATH, ws_open_handler)
         .middleware(enable_cors_all())
-        .middleware(api_auth(&["/api/create-project"]))
+        .middleware(api_auth(&[
+            "/api/create-project",
+            "/api/current-tab-snapshot",
+        ]))
         .post("/api/create-project", oxd_upload_handler)
+        .get("/api/current-tab-snapshot", current_tab_snapshot_handler)
+        .get("/api/snapshot/:downloadId", download_snapshot_handler)
         .get("/", |_req| async move {
             Ok(Response::new("I also serve http requests".into()))
         })
@@ -202,25 +212,29 @@ async fn error_handler(route_err: RouteError) -> Response<Body> {
                 err_code = "TICKET NOT FOUND";
             }
         },
-        _ => {
-        }
+        Error::CurrentSnapshot(current_snapshot_err) => match current_snapshot_err {
+            GetCurrentTabSnapshotError::NoActiveSession
+            | GetCurrentTabSnapshotError::NoTabOpened => {
+                status_code = StatusCode::BAD_REQUEST;
+                err_code = "NO TAB OR SESSION CREATED";
+            }
+            _ => {}
+        },
+        Error::SnapshotDownload(dwnld_err) => match dwnld_err {
+            SnapshotDownloadError::Invalid { download_id: _ }
+            | SnapshotDownloadError::AlreadyDownloaded { download_id: _ } => {
+                status_code = StatusCode::NOT_FOUND;
+                err_code = "NOT FOUND";
+            }
+            _ => {}
+        },
+        _ => {}
     }
 
     return Response::builder()
         .status(status_code)
         .body(Body::from(err_code))
         .unwrap();
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Ticket {
-    id: Id,
-    created_at: Datetime,
-    opened_at: Option<Datetime>,
-    closed_at: Option<Datetime>,
-    exited_at: Option<Datetime>,
-    allow_connect_again: bool,
-    user: Thing,
 }
 
 #[derive(Clone, Debug)]
@@ -277,7 +291,8 @@ pub async fn ws_open_handler(req: Request<Body>) -> Result<Response<Body>, Error
         if let Some((_, ticket)) = token {
             let app = get_app().await;
             let app = app.lock().await;
-            let ticket_opt: Option<Ticket> = app.database().select(("ticket", *ticket)).await?;
+            let ticket_opt: Option<Ticket> =
+                app.database().select((Ticket::TABLE, *ticket)).await?;
 
             match ticket_opt {
                 Some(ticket) => {
@@ -323,8 +338,26 @@ pub async fn ws_open_handler(req: Request<Body>) -> Result<Response<Body>, Error
                         let local_ws = WebSocket::new(ws);
                         let app = get_app().await;
                         let mut app = app.lock().await;
-                        let mut session = app.create_session(user_id, local_ws).await.unwrap();
-                        session.start().await;
+                        let mut session = app
+                            .create_session(user_id, local_ws, get_storage().clone())
+                            .await
+                            .unwrap();
+
+                        loop {
+                            let message = session.receive_message().await;
+                            match message {
+                                Ok(message) => {
+                                    session.handle_message(message).await;
+                                }
+                                Err(e) => match e {
+                                    ReceiveError::Terminated => {
+                                        session.close().await;
+                                        break;
+                                    }
+                                    _ => {}
+                                },
+                            }
+                        }
                     };
 
                     return upgrade_ws(ws_handler)(req).await;
@@ -409,4 +442,133 @@ pub async fn oxd_upload_handler(req: Request<Body>) -> Result<Response<Body>, Er
     }
 
     return Err(Error::CreateProject(CreateProjectError::FileNotProvided));
+}
+
+pub struct SenderWriter {
+    sender: hyper::body::Sender,
+}
+
+impl SenderWriter {
+    pub fn new(sender: hyper::body::Sender) -> SenderWriter {
+        SenderWriter { sender }
+    }
+}
+
+impl AsyncWrite for SenderWriter {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        ready!(self
+            .sender
+            .poll_ready(cx)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?);
+
+        match self.sender.try_send_data(Box::<[u8]>::from(buf).into()) {
+            Ok(()) => Poll::Ready(Ok(buf.len())),
+            Err(_) => Poll::Ready(Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Body closed",
+            ))),
+        }
+    }
+
+    fn poll_flush(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        let res = self.sender.poll_ready(cx);
+        res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        self.poll_flush(cx)
+    }
+}
+
+#[derive(Serialize)]
+pub struct CurrentTabSnapshotResponse {
+    download_id: String,
+}
+
+impl CurrentTabSnapshotResponse {
+    pub fn new(download_id: String) -> CurrentTabSnapshotResponse {
+        CurrentTabSnapshotResponse { download_id }
+    }
+}
+
+pub async fn current_tab_snapshot_handler(
+    req: Request<Body>,
+) -> Result<Response<Body>, Error<StorageError>> {
+    let db = get_db().await;
+    let user_id = req.context::<UserId>().unwrap();
+
+    let snapshot_id = get_current_tab_snapshot_id(db.clone(), user_id.0.clone()).await?;
+    let snapshot_download = SnapshotDownload::new(snapshot_id, user_id.0);
+    let created_download: SnapshotDownload = db
+        .create(SnapshotDownload::TABLE)
+        .content(snapshot_download)
+        .await?;
+
+    let success_response = CurrentTabSnapshotResponse::new(created_download.id.to_string());
+    let json_content = to_string(&success_response).unwrap();
+    return Ok(Response::builder()
+        .status(StatusCode::CREATED)
+        .body(Body::from(json_content))
+        .unwrap());
+}
+
+pub async fn download_snapshot_handler(
+    req: Request<Body>,
+) -> Result<Response<Body>, Error<StorageError>> {
+    let db = get_db().await;
+    let download_id = req.param("downloadId").unwrap();
+
+    let snapshot_download_opt: Option<SnapshotDownload> = db
+        .select((SnapshotDownload::TABLE, download_id.clone()))
+        .await?;
+
+    if let Some(snapshot_download) = snapshot_download_opt {
+        if snapshot_download.downloaded_at.is_some() {
+            return Err(Error::SnapshotDownload(
+                SnapshotDownloadError::AlreadyDownloaded {
+                    download_id: download_id.clone(),
+                },
+            ));
+        }
+
+        let mut snapshot_download_cpy = snapshot_download.clone();
+        snapshot_download_cpy.mark_as_downloaded();
+
+        db.update((SnapshotDownload::TABLE, snapshot_download_cpy.id.clone()))
+            .content(snapshot_download_cpy)
+            .await?;
+
+        let snapshot_id = snapshot_download.snapshot.id.to_string();
+
+        let (sender, body) = Body::channel();
+        let sender_writer = SenderWriter::new(sender);
+        tokio::spawn(async {
+            export_snapshot(
+                get_db().await.clone(),
+                get_storage().clone(),
+                sender_writer,
+                snapshot_id,
+            )
+            .await
+            .unwrap();
+        });
+        Ok(Response::builder()
+            .header("Content-Type", "application/openxd")
+            .body(body)
+            .unwrap())
+    } else {
+        return Err(Error::SnapshotDownload(SnapshotDownloadError::Invalid {
+            download_id: download_id.clone(),
+        }));
+    }
 }

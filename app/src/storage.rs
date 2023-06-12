@@ -14,6 +14,11 @@ pub trait StorageId: Hash + PartialEq + Eq + Serialize + DeserializeOwned + Sync
 
 impl<T> StorageId for T where T: Hash + PartialEq + Eq + Serialize + DeserializeOwned + Sync + Send + Clone {}
 
+pub struct StorageObjInfo {
+    /// Extension of the file object
+    pub ext: Option<String>
+}
+
 /// Storage interface to interact with file system
 #[async_trait]
 pub trait Storage<E: Debug + StdError, ID: StorageId> {
@@ -33,4 +38,10 @@ pub trait Storage<E: Debug + StdError, ID: StorageId> {
 
     /// Removing a saved file
     async fn delete(&self, key: ID) -> Result<(), E>;
+
+    /// Retrieve the information of a storage object
+    async fn info(&self, key: ID) -> Result<StorageObjInfo, E>;
+
+    /// Duplicating a storage object
+    async fn duplicate(&self, key: ID) -> Result<ID, E>;
 }

@@ -3,12 +3,14 @@ use std::{fmt::Debug, rc::Rc};
 use egui::Ui;
 
 use crate::{
-    client::ClientTransport, commands::file::open_file::FileOpenCommand, components::UIComponent,
+    client::ClientTransport, commands::file::{open_file::FileOpenCommand, save_snapshot::SaveSnapshotCommand}, components::UIComponent,
     external::External, scopes::ApplicationScope,
 };
 
 pub enum FileMenuComponentEvent {
     OpenFileClicked,
+    NewProjectClicked,
+    SaveClicked
 }
 
 pub struct FileMenuComponent<
@@ -36,6 +38,12 @@ impl<
             FileMenuComponentEvent::OpenFileClicked => {
                 self.app_scope
                     .execute(FileOpenCommand::new(self.app_scope.clone()));
+            },
+            FileMenuComponentEvent::NewProjectClicked => {
+                self.app_scope.state_mut().open_new_project_dialog();
+            },
+            FileMenuComponentEvent::SaveClicked => {
+                self.app_scope.execute(SaveSnapshotCommand::new(self.app_scope.clone()));
             }
         }
     }
@@ -52,6 +60,14 @@ impl<
         ui.menu_button("File", |ui| {
             if ui.button("Open").clicked() {
                 self.on(FileMenuComponentEvent::OpenFileClicked);
+                ui.close_menu();
+            }
+            if ui.button("New").clicked() {
+                self.on(FileMenuComponentEvent::NewProjectClicked);
+                ui.close_menu();
+            }
+            if ui.button("Save").clicked() {
+                self.on(FileMenuComponentEvent::SaveClicked);
                 ui.close_menu();
             }
         });

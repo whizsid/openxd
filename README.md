@@ -39,4 +39,5 @@ frontend
 
 - [x] Make standalone application, web server, web frontend by sharing same source code.
 - [x] 'Open File' implementation.
-- [ ] `New` implementation.
+- [x] `Create Project` implementation.
+- [x] `Save` implementation

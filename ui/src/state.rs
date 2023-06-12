@@ -13,6 +13,8 @@ pub struct AppState {
     dialog_counter: usize,
     /// Message to display in status bar
     status_message: Option<String>,
+    /// Whether that new project dialog opened or not
+    new_project_opened: bool,
 }
 
 impl AppState {
@@ -20,13 +22,10 @@ impl AppState {
     pub fn new() -> AppState {
         AppState {
             main_ui_disabled: false,
-            dialogs: vec![
-                AppDialog::new(0, Severity::Error, "This is a long long long long long long long long long long long long long long text".into()),
-                AppDialog::new(1, Severity::Error, "This is a long long long long long long long long long long long long long long text".into()),
-                AppDialog::new(2, Severity::Error, "This is a long long long long long long long long long long long long long long text".into()),
-            ],
-            dialog_counter: 3,
+            dialogs: vec![],
+            dialog_counter: 0,
             status_message: None,
+            new_project_opened: false,
         }
     }
 
@@ -113,6 +112,23 @@ impl AppState {
     /// the `get_dialog` or `remove_dialog` to access the command initiator
     pub fn dialogs(&self) -> Vec<AppDialog> {
         self.dialogs.clone()
+    }
+
+    /// Opening the new project window
+    pub fn open_new_project_dialog(&mut self) {
+        self.new_project_opened = true;
+        self.main_ui_disabled = true;
+    }
+
+    /// Closing the new project window
+    pub fn close_new_project_dialog(&mut self) {
+        self.new_project_opened = false;
+        self.main_ui_disabled = false;
+    }
+
+    /// Whether that new project window opened or not
+    pub fn is_new_project_dialog_opened(&self) -> bool {
+        self.new_project_opened
     }
 }
 
@@ -219,7 +235,8 @@ impl AppDialog {
     /// You can set callbacks using the returned `&mut AppDialogButton`
     pub fn add_button(&mut self, severity: Severity, text: String) -> &mut AppDialogButton {
         let len_btn = self.buttons.len();
-        self.buttons.push(AppDialogButton::new(len_btn, severity, text));
+        self.buttons
+            .push(AppDialogButton::new(len_btn, severity, text));
         self.buttons.get_mut(len_btn).unwrap()
     }
 
@@ -287,5 +304,24 @@ impl Clone for AppDialog {
             id: self.id,
             on_close_cmd: None,
         }
+    }
+}
+
+/// States related to create a project window
+pub struct CreateProjectWindowState {
+    project_name: String
+}
+
+impl CreateProjectWindowState {
+    pub fn new() -> CreateProjectWindowState {
+        CreateProjectWindowState { project_name: String::new() }
+    }
+
+    pub fn change_project_name(&mut self, name: String) {
+        self.project_name = name;
+    }
+
+    pub fn get_project_name(&self) -> String {
+        self.project_name.clone()
     }
 }

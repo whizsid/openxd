@@ -27,3 +27,7 @@ pub trait ReplaceAsset<TO: StorageId > {
     /// Replace asset URLs/ids
     fn replace_asset<'a>(self, assets: &'a mut HashMap<Self::From, TO>)-> Self::Output;
 }
+
+pub trait GetAssets<S: StorageId> {
+    fn get_assets(&self) -> Vec<S>;
+}

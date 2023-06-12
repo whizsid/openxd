@@ -1,6 +1,6 @@
 use std::{array::TryFromSliceError, fmt::Debug};
 
-use app::external::CreateProjectUsingExistingFileError;
+use app::external::{CreateProjectUsingExistingFileError, GetCurrentTabSnapshotError, ExportSnapshotError};
 use hmac::digest::InvalidLength;
 use hyper::header::ToStrError;
 
@@ -24,7 +24,11 @@ pub enum Error <SE: Debug + std::error::Error + Send + Sync> {
     #[error(transparent)]
     CreateProject(#[from] CreateProjectError<SE>),
     #[error(transparent)]
-    Auth(#[from] AuthError)
+    Auth(#[from] AuthError),
+    #[error(transparent)]
+    CurrentSnapshot(#[from] GetCurrentTabSnapshotError),
+    #[error(transparent)]
+    SnapshotDownload(#[from] SnapshotDownloadError<SE>),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -73,4 +77,14 @@ pub enum AuthError {
     Jwt(#[from] jwt::Error),
     #[error("token didn't matched the requirements")]
     InvalidLength(#[from] InvalidLength)
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum SnapshotDownloadError<SE: Debug + std::error::Error + Send + Sync> {
+    #[error("invalid request")]
+    Invalid { download_id: String },
+    #[error("already downloaded the snapshot for given request")]
+    AlreadyDownloaded {download_id: String},
+    #[error(transparent)]
+    ExportError (#[from] ExportSnapshotError<SE>)
 }

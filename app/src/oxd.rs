@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 use surrealdb::sql::Id;
 
-use crate::{asset::ReplaceAsset, storage::StorageId, OXD_VERSION};
+use crate::{asset::{ReplaceAsset, GetAssets}, storage::StorageId, OXD_VERSION};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OxdXml<A: StorageId> {
@@ -37,5 +37,11 @@ impl<A: StorageId, B: StorageId> ReplaceAsset<B> for OxdXml<A> {
             version: self.version,
             _phantom: PhantomData,
         }
+    }
+}
+
+impl <A: StorageId> GetAssets<A> for OxdXml<A> {
+    fn get_assets(&self) -> Vec<A> {
+        return vec![];
     }
 }

@@ -1,9 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use futures::{Stream, Sink};
-use transport::{ui::UIMessage, app::{ApplicationMessage, ErrorMessage, FileOpenedMessage}, Client as InternalClient, ReceiveError, SendError};
-
-use crate::messages::ConnectionStartMessage;
+use transport::{ui::UIMessage, app::{ApplicationMessage, ErrorMessage, TabCreatedMessage, PongMessage}, Client as InternalClient, ReceiveError, SendError};
 
 /// Trait constraints to internal transport of the `Client`
 pub trait ClientTransport<E: Debug + Send>:
@@ -30,15 +28,19 @@ impl<E: Debug + Send, T: ClientTransport<E>> Client<E, T> {
         }
     }
 
-    pub async fn wait_till_init(&mut self) -> Result<ConnectionStartMessage, ReceiveError> {
-        self.internal.receive::<ConnectionStartMessage>().await
+    pub async fn receive(&mut self) -> Result<UIMessage, ReceiveError> {
+        self.internal.receive_raw().await
     }
 
     pub async fn error<NE: Debug>(&mut self, err: NE)  -> Result<(), SendError<E>> {
         self.internal.send(ErrorMessage::new(format!("{:?}", err))).await
     }
 
-    pub async fn file_opened(&mut self) -> Result<(), SendError<E>> {
-        self.internal.send(FileOpenedMessage::new()).await
+    pub async fn tab_created(&mut self, tab_name: String, tab_id: String) -> Result<(), SendError<E>> {
+        self.internal.send(TabCreatedMessage::new(tab_name, tab_id)).await
+    }
+
+    pub async fn pong(&mut self) -> Result<() , SendError<E>> {
+        self.internal.send(PongMessage::new()).await
     }
 }

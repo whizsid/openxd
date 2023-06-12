@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum UIMessage {
@@ -6,21 +6,23 @@ pub enum UIMessage {
     Close,
     Error(String),
     OpenFile(String),
-    NewFile,
+    NewProject(String),
 }
 
 #[derive(Clone)]
-pub struct OpenFileMessage(String);
+pub struct OpenFileMessage {
+    pub project_id: String,
+}
 
 impl OpenFileMessage {
-    pub fn new(cache_id: String) -> OpenFileMessage {
-        OpenFileMessage(cache_id)
+    pub fn new(project_id: String) -> OpenFileMessage {
+        OpenFileMessage { project_id }
     }
 }
 
 impl Into<UIMessage> for OpenFileMessage {
     fn into(self) -> UIMessage {
-        UIMessage::OpenFile(self.0)
+        UIMessage::OpenFile(self.project_id)
     }
 }
 
@@ -29,33 +31,35 @@ impl TryFrom<UIMessage> for OpenFileMessage {
 
     fn try_from(value: UIMessage) -> Result<Self, Self::Error> {
         match value {
-            UIMessage::OpenFile(cache_id) => Ok(OpenFileMessage(cache_id)),
-            _=> Err(())
+            UIMessage::OpenFile(project_id) => Ok(OpenFileMessage { project_id }),
+            _ => Err(()),
         }
     }
 }
 
-pub struct NewFileMessage;
+pub struct NewProjectMessage {
+    pub project_name: String,
+}
 
-impl NewFileMessage {
-    pub fn new() -> NewFileMessage {
-        NewFileMessage
+impl NewProjectMessage {
+    pub fn new(project_name: String) -> NewProjectMessage {
+        NewProjectMessage { project_name }
     }
 }
 
-impl Into<UIMessage> for NewFileMessage {
+impl Into<UIMessage> for NewProjectMessage {
     fn into(self) -> UIMessage {
-        UIMessage::NewFile
+        UIMessage::NewProject(self.project_name)
     }
 }
 
-impl TryFrom<UIMessage> for NewFileMessage {
+impl TryFrom<UIMessage> for NewProjectMessage {
     type Error = ();
 
     fn try_from(value: UIMessage) -> Result<Self, Self::Error> {
         match value {
-            UIMessage::NewFile => Ok(NewFileMessage),
-            _ => Err(())
+            UIMessage::NewProject(project_name) => Ok(NewProjectMessage::new(project_name)),
+            _ => Err(()),
         }
     }
 }

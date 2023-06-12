@@ -5,16 +5,16 @@
 
 use std::{fmt::Debug, rc::Rc};
 
-use egui::{CentralPanel, Context, TopBottomPanel};
+use egui::{CentralPanel, Context, TopBottomPanel, Window};
 
 use crate::client::ClientTransport;
 use crate::components::dialog_container::DialogContainerComponent;
 use crate::components::menu::MenuComponent;
 use crate::components::status_bar::StatusBarComponent;
-use crate::components::{UIComponent, TopLevelUIComponent};
+use crate::components::windows::create_project_window::CreateProjectWindow;
+use crate::components::{TopLevelUIComponent, UIComponent};
 use crate::external::External;
-use crate::scopes::ApplicationScope;
-
+use crate::scopes::{ApplicationScope, CreateProjectWindowScope};
 
 pub struct Ui<
     TE: Debug + Send + 'static,
@@ -26,7 +26,8 @@ pub struct Ui<
     // Componentes
     menu_component: MenuComponent<TE, EE, T, E>,
     status_bar_component: StatusBarComponent<TE, EE, T, E>,
-    dialog_container_component: DialogContainerComponent<TE, EE, T, E>
+    dialog_container_component: DialogContainerComponent<TE, EE, T, E>,
+    create_project_window: CreateProjectWindow<TE, EE, T, E>,
 }
 
 impl<
@@ -44,7 +45,10 @@ impl<
             scope: app_scope.clone(),
             menu_component: MenuComponent::new(app_scope.clone()),
             status_bar_component: StatusBarComponent::new(app_scope.clone()),
-            dialog_container_component: DialogContainerComponent::new(app_scope)
+            dialog_container_component: DialogContainerComponent::new(app_scope.clone()),
+            create_project_window: CreateProjectWindow::new(CreateProjectWindowScope::new(
+                app_scope.client(),
+            ), app_scope.clone()),
         }
     }
 
@@ -70,7 +74,10 @@ impl<
             });
 
         // Dialogs
-        self.dialog_container_component.draw(ctx); 
+        self.dialog_container_component.draw(ctx);
+
+        // Windows
+        self.create_project_window.draw(ctx);
 
         CentralPanel::default().show(ctx, |ui| {
             ui.add_enabled_ui(!main_ui_disabled, |ui| {

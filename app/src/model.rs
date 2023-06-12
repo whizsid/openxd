@@ -16,12 +16,14 @@ impl User {
 }
 
 /// Data that should be stored in the database related to a session
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Session {
-    id: Id,
-    user: Thing,
-    created_at: Datetime,
-    last_activity: Datetime,
+    pub id: Id,
+    pub user: Thing,
+    pub created_at: Datetime,
+    pub last_activity: Datetime,
+    pub closed_at: Option<Datetime>,
+    pub current_tab: Option<Thing>,
 }
 
 impl Session {
@@ -31,12 +33,25 @@ impl Session {
         Session {
             created_at: Datetime::default(),
             last_activity: Datetime::default(),
+            closed_at: None,
             user: Thing {
                 tb: String::from(User::TABLE),
                 id: user_id,
             },
             id: Id::String(String::from("")),
+            current_tab: None,
         }
+    }
+
+    pub fn set_current_tab(&mut self, tab_id: Id) {
+        self.current_tab = Some(Thing {
+            tb: String::from(Tab::TABLE),
+            id: tab_id,
+        });
+    }
+
+    pub fn mark_closed(&mut self) {
+        self.closed_at = Some(Datetime::default());
     }
 }
 
@@ -44,6 +59,7 @@ impl Session {
 /// by creating separate tabs. A tab is representing a tab in the editor.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Tab {
+    pub id: Id,
     /// Users can edit the name of a tab. By default it should similiar to
     /// the project name and branch name
     pub name: String,
@@ -58,7 +74,42 @@ pub struct Tab {
     pub branch: Thing,
     /// Current snapshot of the tab. This should be updated with the user
     /// actions
-    pub snapshot: Thing
+    pub snapshot: Thing,
+}
+
+impl Tab {
+    pub const TABLE: &str = "tabs";
+
+    pub fn new<SI: StorageId>(
+        name: String,
+        session_id: Id,
+        head_id: Id,
+        branch_id: Id,
+        snapshot_id: Id,
+    ) -> Tab {
+        Tab {
+            id: Id::String(String::new()),
+            name,
+            session: Thing {
+                tb: String::from(Session::TABLE),
+                id: session_id,
+            },
+            created_at: Datetime::default(),
+            exited_at: None,
+            head: Thing {
+                tb: String::from(Commit::TABLE),
+                id: head_id,
+            },
+            branch: Thing {
+                tb: String::from(Branch::TABLE),
+                id: branch_id,
+            },
+            snapshot: Thing {
+                tb: String::from(OxdXml::<SI>::TABLE),
+                id: snapshot_id,
+            },
+        }
+    }
 }
 
 /// Actions that not taken to any commit.
@@ -70,7 +121,7 @@ pub struct TabAction {
     pub tab: Thing,
     pub created_at: Datetime,
     /// Action data
-    pub action: AnyAction
+    pub action: AnyAction,
 }
 
 /// When a user trying to change the branch/ commit in the tab, they
@@ -87,7 +138,7 @@ pub struct Stash {
     /// Related branch
     pub branch: Thing,
     /// Snapshot when stashing the changes
-    pub snapshot: Thing
+    pub snapshot: Thing,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -121,8 +172,8 @@ impl Project {
             },
             owner: Thing {
                 tb: String::from(User::TABLE),
-                id: user_id
-            }
+                id: user_id,
+            },
         }
     }
 }
@@ -139,10 +190,7 @@ pub struct Branch {
 impl Branch {
     pub const TABLE: &str = "branches";
 
-    pub fn new<A: StorageId>(
-        name: String,
-        head: Option<Id>,
-    ) -> Branch {
+    pub fn new<A: StorageId>(name: String, head: Option<Id>) -> Branch {
         Branch {
             id: Id::String(String::new()),
             name,
@@ -173,7 +221,13 @@ pub struct Commit {
 impl Commit {
     pub const TABLE: &str = "commits";
 
-    pub fn new<A: StorageId>(message: String, branch_id: Id, user_id: Id, head: Option<Id>, snapshot_id: Id) -> Commit {
+    pub fn new<A: StorageId>(
+        message: String,
+        branch_id: Id,
+        user_id: Id,
+        head: Option<Id>,
+        snapshot_id: Id,
+    ) -> Commit {
         Commit {
             id: Id::String(String::new()),
             message,
@@ -192,8 +246,8 @@ impl Commit {
             }),
             snapshot: Thing {
                 tb: String::from(OxdXml::<A>::TABLE),
-                id: snapshot_id
-            }
+                id: snapshot_id,
+            },
         }
     }
 }
