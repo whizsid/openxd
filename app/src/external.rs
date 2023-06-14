@@ -12,43 +12,33 @@ use std::{
     sync::Arc,
 };
 
-use futures::StreamExt;
+use futures::AsyncReadExt;
 use surrealdb::{sql::Id, Connection, Surreal};
-use tokio::io::{AsyncBufRead, AsyncReadExt, AsyncWrite};
+use tokio::io::{AsyncBufRead, AsyncWrite, AsyncWriteExt};
+use tokio_util::compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt};
 
 use crate::{
     asset::{detect_asset_type_by_ext, GetAssets, ReplaceAsset},
     helpers::remove_symbols_and_extra_spaces,
-    model::{Branch, Commit, Project, Session, Tab, thing, User, Snapshot},
+    model::{thing, Branch, Commit, Project, Session, Snapshot, Tab, User},
     oxd::OxdXml,
     storage::{Storage, StorageId},
     DEFAULT_BRANCH,
 };
 
-#[cfg(feature="compression-zstd")]
-use async_compression::tokio::{bufread::ZstdDecoder as Decoder, write::ZstdEncoder as Encoder};
-#[cfg(feature="compression-xz")]
-use async_compression::tokio::{bufread::XzDecoder as Decoder, write::XzEncoder as Encoder};
-#[cfg(feature="compression-zlib")]
-use async_compression::tokio::{bufread::ZlibDecoder as Decoder, write::ZlibEncoder as Encoder};
-#[cfg(feature="compression-lzma")]
-use async_compression::tokio::{bufread::LzmaDecoder as Decoder, write::LzmaEncoder as Encoder};
-#[cfg(feature="compression-gzip")]
-use async_compression::tokio::{bufread::GzipDecoder as Decoder, write::GzipEncoder as Encoder};
-#[cfg(feature="compression-deflate")]
-use async_compression::tokio::{bufread::DeflateDecoder as Decoder, write::DeflateEncoder as Encoder};
-#[cfg(feature="compression-brotli")]
-use async_compression::tokio::{bufread::BrotliDecoder as Decoder, write::BrotliEncoder as Encoder};
-#[cfg(feature="compression-bzip2")]
-use async_compression::tokio::{bufread::BzDecoder as Decoder, write::BzEncoder as Encoder};
-
 use serde_xml_rs::{de::from_str as xml_from_str, ser::to_string as xml_to_str};
-use tokio_tar::{Archive, Builder, Header};
+
+use async_zip::{
+    base::{read::stream::ZipFileReader, write::ZipFileWriter},
+    Compression, ZipEntryBuilder,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CreateProjectUsingExistingFileError<SE: Debug + std::error::Error + Send + Sync> {
     #[error("error occured while reading/writing the data")]
     Io(#[from] std::io::Error),
+    #[error("could not decompress the oxd")]
+    Zip(#[from] async_zip::error::ZipError),
     #[error("unsupported asset format {path}")]
     UnsupportedAsset { path: String },
     #[error("data not properly formatted.")]
@@ -78,19 +68,18 @@ pub async fn create_project_using_existing_file<
     user_id: String,
 ) -> Result<Project, CreateProjectUsingExistingFileError<SE>> {
     let project_id = Id::rand();
-    let decoder = Decoder::new(content);
-    let mut tar = Archive::new(decoder);
-    let mut entries = tar.entries()?;
+    let mut zip_entry_reader = ZipFileReader::with_tokio(content);
     let mut oxd_content_opt: Option<OxdXml<PathBuf>> = None;
     let mut path_id_map: HashMap<PathBuf, SI> = HashMap::new();
-    while let Some(entry) = entries.next().await {
-        let mut entry = entry?;
-        let path = entry.path()?;
-        match path.extension() {
+    while let Some(mut entry) = zip_entry_reader.next_with_entry().await? {
+        let path = entry.reader().entry().filename().as_str()?;
+        let path = PathBuf::from(path);
+        match path.clone().extension() {
             Some(ext) => {
                 if ext == "xml" {
+                    let reader_mut = entry.reader_mut();
                     let mut xml_bytes: Vec<u8> = Vec::new();
-                    entry.read_to_end(&mut xml_bytes).await?;
+                    reader_mut.read_to_end(&mut xml_bytes).await?;
                     let xml_str = from_utf8(&xml_bytes)?;
                     let xml: OxdXml<PathBuf> = xml_from_str(xml_str)?;
                     oxd_content_opt = Some(xml);
@@ -99,17 +88,16 @@ pub async fn create_project_using_existing_file<
                         Some(_) => {
                             let ext = ext.to_str().unwrap();
                             let ext_cloned = String::from(ext);
-                            let path_new = entry.path().unwrap();
-                            let path_buf = path_new.to_path_buf();
+                            let mut reader = entry.reader_mut().compat();
                             let id = storage
                                 .put(
-                                    &mut entry,
+                                    &mut reader,
                                     format!("session/{}/assets", project_id),
                                     ext_cloned,
                                 )
                                 .await
                                 .map_err(CreateProjectUsingExistingFileError::Storage)?;
-                            path_id_map.insert(path_buf, id);
+                            path_id_map.insert(path, id);
                         }
                         None => {
                             return Err(CreateProjectUsingExistingFileError::UnsupportedAsset {
@@ -125,6 +113,8 @@ pub async fn create_project_using_existing_file<
                 });
             }
         }
+
+        zip_entry_reader = entry.skip().await?;
     }
 
     match oxd_content_opt.take() {
@@ -184,7 +174,10 @@ pub enum GetCurrentTabSnapshotError {
     NoTabOpened,
 }
 
-pub async fn get_current_tab_snapshot_id<D: Connection> (db: Arc<Surreal<D>>, user_id: String) -> Result<String, GetCurrentTabSnapshotError> {
+pub async fn get_current_tab_snapshot_id<D: Connection>(
+    db: Arc<Surreal<D>>,
+    user_id: String,
+) -> Result<String, GetCurrentTabSnapshotError> {
     let mut sessions = db.query("SELECT * FROM type::table($table) WHERE user=type::thing($user_id) AND closed_at IS none ORDER BY last_activity DESC LIMIT 1")
         .bind(("table", Session::TABLE))
         .bind(("user_id", thing(User::TABLE, user_id.clone())))
@@ -217,6 +210,8 @@ pub enum ExportSnapshotError<SE: std::error::Error + Debug + Send + Sync> {
     Serde(#[from] serde_xml_rs::Error),
     #[error("not found a snapshot for the id")]
     NotFound,
+    #[error("could not compress the oxd")]
+    Zip(#[from] async_zip::error::ZipError),
 }
 /// Exporting a snapshot to a oxd file
 pub async fn export_snapshot<
@@ -231,9 +226,7 @@ pub async fn export_snapshot<
     body: W,
     snapshot_id: String,
 ) -> Result<(), ExportSnapshotError<SE>> {
-
-    let snapshot: Option<Snapshot<SI>> =
-        db.select((Snapshot::<SI>::TABLE, &snapshot_id)).await?;
+    let snapshot: Option<Snapshot<SI>> = db.select((Snapshot::<SI>::TABLE, &snapshot_id)).await?;
 
     if snapshot.is_none() {
         return Err(ExportSnapshotError::NotFound);
@@ -245,12 +238,11 @@ pub async fn export_snapshot<
 
     let storage_objs = oxd.get_assets();
 
-    let encoder = Encoder::with_quality(body, async_compression::Level::Best);
-    let mut tar_builder = Builder::new(encoder);
+    let mut zip_writer = ZipFileWriter::with_tokio(body);
 
     let mut replace: HashMap<SI, PathBuf> = HashMap::new();
     for (i, id) in storage_objs.iter().enumerate() {
-        let obj = storage
+        let mut obj = storage
             .get(id.clone())
             .await
             .map_err(ExportSnapshotError::Storage)?;
@@ -259,33 +251,27 @@ pub async fn export_snapshot<
             .await
             .map_err(ExportSnapshotError::Storage)?;
 
-        let mut header = Header::new_gnu();
-        header.set_size(info.size);
-        let mut path = PathBuf::from("./");
-        if let Some(ext) = info.ext {
-            path = path.join(format!("{}.{}", i, &ext));
-        }
-        tar_builder
-            .append_data(&mut header, path.clone(), obj)
-            .await?;
-        replace.insert(id.clone(), path);
+        let path = if let Some(ext) = info.ext {
+            format!("{}.{}", i, &ext)
+        } else {
+            i.to_string()
+        };
+        let opts = ZipEntryBuilder::new(path.clone().into(), Compression::Xz);
+        let entry_writer = zip_writer.write_entry_stream(opts).await?;
+        let mut compat_entry_writer = entry_writer.compat_write();
+        tokio::io::copy(&mut obj, &mut compat_entry_writer).await?;
+        compat_entry_writer.flush().await?;
+        replace.insert(id.clone(), PathBuf::from(path));
+        compat_entry_writer.shutdown().await?;
     }
 
     let replaced_oxd = oxd.replace_asset(&mut replace);
     let xml = xml_to_str(&replaced_oxd)?;
     let xml_bytes = xml.into_bytes();
-    let mut xml_bytes_slice = xml_bytes.as_slice();
 
-    let mut header = Header::new_gnu();
-    header.set_size(xml_bytes_slice.len() as u64);
-    tar_builder
-        .append_data(
-            &mut header,
-            PathBuf::from("./oxd.xml"),
-            &mut xml_bytes_slice,
-        )
-        .await?;
-    tar_builder.finish().await?;
+    let opts = ZipEntryBuilder::new(format!("oxd.xml").into(), Compression::Xz);
+    zip_writer.write_entry_whole(opts, &xml_bytes).await?;
+    zip_writer.close().await?;
 
     Ok(())
 }
