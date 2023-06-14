@@ -1,12 +1,13 @@
 use asset::{GetAssets, ReplaceAsset};
 use client::{Client, ClientTransport};
 use helpers::remove_symbols_and_extra_spaces;
+use log::warn;
 use oxd::OxdXml;
-use std::{collections::HashMap, fmt::Debug, sync::Arc, marker::PhantomData};
-use storage::{StorageId, Storage};
+use std::error::Error as StdError;
+use std::{collections::HashMap, fmt::Debug, marker::PhantomData, sync::Arc};
+use storage::{Storage, StorageId};
 use surrealdb::{sql::Id, Connection, Surreal};
 use transport::{ui::UIMessage, ReceiveError};
-use std::error::Error as StdError;
 
 pub mod action;
 mod asset;
@@ -17,7 +18,7 @@ pub mod model;
 pub mod oxd;
 pub mod storage;
 
-use model::{Branch, Commit, Project, Session as SessionModel, Tab};
+use model::{thing, Branch, Commit, Project, Session as SessionModel, Tab, User, Snapshot};
 
 pub static OXD_VERSION: &str = "0.0.1";
 pub static DEFAULT_BRANCH: &str = "main";
@@ -28,27 +29,33 @@ pub struct App<D: Connection> {
 
 impl<D: Connection> App<D> {
     pub fn new(db: Arc<Surreal<D>>) -> App<D> {
-        App { db}
+        App { db }
     }
 
     /// Creating a user session in editor
-    pub async fn create_session<SE: Debug + StdError, SI: StorageId, S: Storage<SE, SI>, TE: Debug + Send, T: ClientTransport<TE>>(
+    pub async fn create_session<
+        SE: Debug + StdError,
+        SI: StorageId,
+        S: Storage<SE, SI>,
+        TE: Debug + Send,
+        T: ClientTransport<TE>,
+    >(
         &mut self,
         user_id: String,
         internal_client: T,
-        storage: Arc<S>
-    ) -> Result<Session<SE, SI, S,TE, T, D>, surrealdb::Error> {
+        storage: Arc<S>,
+    ) -> Result<Session<SE, SI, S, TE, T, D>, surrealdb::Error> {
         let session_data: SessionModel = self
             .db
             .create(SessionModel::TABLE)
-            .content(SessionModel::create(Id::String(user_id.clone())))
+            .content(SessionModel::create(thing(User::TABLE, user_id.clone())))
             .await?;
         Ok(Session::new(
             session_data,
             internal_client,
             user_id.clone(),
             self.db.clone(),
-            storage
+            storage,
         ))
     }
 
@@ -64,30 +71,45 @@ impl<D: Connection> App<D> {
 /// So there can be sessions without any project. Also there can be multiple
 /// tickets with the same session. Because someone can reuse the same session
 /// after closing the editor without saving.
-pub struct Session<SE: Debug + StdError, SI: StorageId, S: Storage<SE, SI>,TE: Debug + Send, T: ClientTransport<TE>, D: Connection> {
+pub struct Session<
+    SE: Debug + StdError,
+    SI: StorageId,
+    S: Storage<SE, SI>,
+    TE: Debug + Send,
+    T: ClientTransport<TE>,
+    D: Connection,
+> {
     client: Client<TE, T>,
     db: Arc<Surreal<D>>,
     data: SessionModel,
     user_id: String,
     storage: Arc<S>,
-    _phantom: PhantomData<(SE, SI)>
+    _phantom: PhantomData<(SE, SI)>,
 }
 
-impl<SE: Debug + StdError, SI: StorageId, S: Storage<SE, SI> ,TE: Debug + Send, T: ClientTransport<TE>, D: Connection> Session<SE, SI, S, TE, T, D> {
+impl<
+        SE: Debug + StdError,
+        SI: StorageId,
+        S: Storage<SE, SI>,
+        TE: Debug + Send,
+        T: ClientTransport<TE>,
+        D: Connection,
+    > Session<SE, SI, S, TE, T, D>
+{
     pub fn new(
         data: SessionModel,
         internal_client: T,
         user_id: String,
         db: Arc<Surreal<D>>,
-        storage: Arc<S>
-    ) -> Session<SE, SI, S,TE, T, D> {
+        storage: Arc<S>,
+    ) -> Session<SE, SI, S, TE, T, D> {
         Session {
             client: Client::new(internal_client),
             data,
             user_id,
             db,
             storage,
-            _phantom: PhantomData
+            _phantom: PhantomData,
         }
     }
 
@@ -98,21 +120,25 @@ impl<SE: Debug + StdError, SI: StorageId, S: Storage<SE, SI> ,TE: Debug + Send, 
     /// Starting the session
     pub async fn handle_message(&mut self, message: UIMessage) {
         match message {
-            UIMessage::OpenFile(message) => {
-                self.add_tab_with_project(message).await;
-            }
+            UIMessage::OpenFile(message) => match self.add_tab_with_project(message).await {
+                Ok(_) => {}
+                Err(e) => {
+                    warn!("Failed to add opened project as a tab:- {:?}", e);
+                    self.client.error(e).await.unwrap();
+                }
+            },
             UIMessage::NewProject(message) => {
                 let project_created = self.create_project(message).await;
                 match project_created {
-                    Ok(project_id) => {
-                        match self.add_tab_with_project(project_id).await {
-                            Ok(_) => {},
-                            Err(e) => {
-                                self.client.error(e).await.unwrap();
-                            }
+                    Ok(project_id) => match self.add_tab_with_project(project_id).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            warn!("Failed to add created project as a tab:- {:?}", e);
+                            self.client.error(e).await.unwrap();
                         }
-                    }
+                    },
                     Err(err) => {
+                        warn!("Failed to create the project:- {:?}", err);
                         self.client.error(err).await.unwrap();
                     }
                 }
@@ -128,10 +154,12 @@ impl<SE: Debug + StdError, SI: StorageId, S: Storage<SE, SI> ,TE: Debug + Send, 
         &mut self,
         project_name: String,
     ) -> Result<String, CreateProjectError> {
-        let snapshot = OxdXml::<SI>::new();
-        let created_oxd: OxdXml<SI> = self
+        let oxd = OxdXml::<SI>::new();
+        let snapshot = Snapshot::new(oxd);
+
+        let created_oxd: Snapshot<SI> = self
             .db
-            .create(OxdXml::<SI>::TABLE)
+            .create(Snapshot::<SI>::TABLE)
             .content(snapshot)
             .await?;
 
@@ -140,10 +168,10 @@ impl<SE: Debug + StdError, SI: StorageId, S: Storage<SE, SI> ,TE: Debug + Send, 
 
         let commit = Commit::new::<SI>(
             String::from("Initial Commit"),
-            created_branch.id.clone(),
-            Id::String(self.user_id.clone()),
+            created_branch.id.clone().unwrap(),
+            thing(User::TABLE, self.user_id.clone()),
             None,
-            created_oxd.id,
+            created_oxd.id.unwrap(),
         );
         let _created_commit: Commit = self.db.create(Commit::TABLE).content(commit).await?;
 
@@ -151,15 +179,15 @@ impl<SE: Debug + StdError, SI: StorageId, S: Storage<SE, SI> ,TE: Debug + Send, 
         let slug = file_name_without_sym_spc.to_lowercase().replace("", "-");
 
         let project = Project::new(
-            Id::rand(),
+            thing(Project::TABLE, Id::rand()),
             String::from(file_name_without_sym_spc),
             slug,
-            created_branch.id,
-            Id::String(self.user_id.clone()),
+            created_branch.id.unwrap(),
+            thing(User::TABLE, self.user_id.clone()),
         );
         let created_project: Project = self.db.create(Project::TABLE).content(project).await?;
 
-        Ok(created_project.id.to_string())
+        Ok(created_project.id.unwrap().id.to_string())
     }
 
     pub async fn add_tab_with_project(
@@ -183,42 +211,49 @@ impl<SE: Debug + StdError, SI: StorageId, S: Storage<SE, SI> ,TE: Debug + Send, 
         let commit: Option<Commit> = commit_res.take(0)?;
         let commit = commit.unwrap();
 
-        let mut snapshot: OxdXml<SI> = self.db.select(commit.snapshot).await?;
-        snapshot.id = Id::String(String::new());
-        let assets = snapshot.get_assets();
+        let mut snapshot: Snapshot<SI> = self.db.select(commit.snapshot).await?;
+        snapshot.id = None;
+        let oxd = snapshot.oxd;
+        let assets = oxd.get_assets();
         let mut replaced_assets: HashMap<SI, SI> = HashMap::new();
         for asset in assets {
-            let duplicated = self.storage.duplicate(asset.clone()).await.map_err(AddTabError::Storage)?;
+            let duplicated = self
+                .storage
+                .duplicate(asset.clone())
+                .await
+                .map_err(AddTabError::Storage)?;
             replaced_assets.insert(asset, duplicated);
         }
 
-        let replaced_snapshot = snapshot.replace_asset(&mut replaced_assets);
-        let created_snapshot: OxdXml<SI> = self
+        let replaced_oxd = oxd.replace_asset(&mut replaced_assets);
+        let replaced_snapshot = Snapshot::new(replaced_oxd);
+        let created_snapshot: Snapshot<SI> = self
             .db
-            .create(OxdXml::<SI>::TABLE)
+            .create(Snapshot::<SI>::TABLE)
             .content(replaced_snapshot)
             .await?;
 
         let tab = Tab::new::<SI>(
             project.name,
-            self.data.id.clone(),
-            commit.id,
-            default_branch.id,
-            created_snapshot.id,
+            self.data.id.clone().unwrap(),
+            commit.id.unwrap(),
+            default_branch.id.unwrap(),
+            created_snapshot.id.unwrap(),
         );
         let created_tab: Tab = self.db.create(Tab::TABLE).content(tab).await?;
 
         let mut updated_session = self.data.clone();
-        updated_session.set_current_tab(created_tab.id.clone());
-        self.data = updated_session;
+        updated_session.set_current_tab(created_tab.id.clone().unwrap());
+        self.data = updated_session.clone();
 
-        self.db
-            .update((SessionModel::TABLE, self.data.id.clone()))
-            .content(self.data.clone())
+        let _: Option<SessionModel> = self
+            .db
+            .update(updated_session.id.clone().unwrap())
+            .content(updated_session)
             .await?;
 
         self.client
-            .tab_created(created_tab.name, created_tab.id.to_string())
+            .tab_created(created_tab.name, created_tab.id.unwrap().id.to_string())
             .await
             .unwrap();
 
@@ -228,7 +263,12 @@ impl<SE: Debug + StdError, SI: StorageId, S: Storage<SE, SI> ,TE: Debug + Send, 
     pub async fn close(&mut self) {
         let mut session = self.data.clone();
         session.mark_closed();
-        let _res: Option<SessionModel> = self.db.update((SessionModel::TABLE, self.data.id.clone())).content(session).await.unwrap();
+        let _res: Option<SessionModel> = self
+            .db
+            .update((SessionModel::TABLE, self.data.id.clone().unwrap().id))
+            .content(session)
+            .await
+            .unwrap();
     }
 }
 

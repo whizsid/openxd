@@ -19,13 +19,29 @@ use tokio::io::{AsyncBufRead, AsyncReadExt, AsyncWrite};
 use crate::{
     asset::{detect_asset_type_by_ext, GetAssets, ReplaceAsset},
     helpers::remove_symbols_and_extra_spaces,
-    model::{Branch, Commit, Project, Session, Tab},
+    model::{Branch, Commit, Project, Session, Tab, thing, User, Snapshot},
     oxd::OxdXml,
     storage::{Storage, StorageId},
     DEFAULT_BRANCH,
 };
 
-use async_compression::tokio::{bufread::XzDecoder, write::XzEncoder};
+#[cfg(feature="compression-zstd")]
+use async_compression::tokio::{bufread::ZstdDecoder as Decoder, write::ZstdEncoder as Encoder};
+#[cfg(feature="compression-xz")]
+use async_compression::tokio::{bufread::XzDecoder as Decoder, write::XzEncoder as Encoder};
+#[cfg(feature="compression-zlib")]
+use async_compression::tokio::{bufread::ZlibDecoder as Decoder, write::ZlibEncoder as Encoder};
+#[cfg(feature="compression-lzma")]
+use async_compression::tokio::{bufread::LzmaDecoder as Decoder, write::LzmaEncoder as Encoder};
+#[cfg(feature="compression-gzip")]
+use async_compression::tokio::{bufread::GzipDecoder as Decoder, write::GzipEncoder as Encoder};
+#[cfg(feature="compression-deflate")]
+use async_compression::tokio::{bufread::DeflateDecoder as Decoder, write::DeflateEncoder as Encoder};
+#[cfg(feature="compression-brotli")]
+use async_compression::tokio::{bufread::BrotliDecoder as Decoder, write::BrotliEncoder as Encoder};
+#[cfg(feature="compression-bzip2")]
+use async_compression::tokio::{bufread::BzDecoder as Decoder, write::BzEncoder as Encoder};
+
 use serde_xml_rs::{de::from_str as xml_from_str, ser::to_string as xml_to_str};
 use tokio_tar::{Archive, Builder, Header};
 
@@ -62,8 +78,8 @@ pub async fn create_project_using_existing_file<
     user_id: String,
 ) -> Result<Project, CreateProjectUsingExistingFileError<SE>> {
     let project_id = Id::rand();
-    let xz_decoder = XzDecoder::new(content);
-    let mut tar = Archive::new(xz_decoder);
+    let decoder = Decoder::new(content);
+    let mut tar = Archive::new(decoder);
     let mut entries = tar.entries()?;
     let mut oxd_content_opt: Option<OxdXml<PathBuf>> = None;
     let mut path_id_map: HashMap<PathBuf, SI> = HashMap::new();
@@ -72,7 +88,7 @@ pub async fn create_project_using_existing_file<
         let path = entry.path()?;
         match path.extension() {
             Some(ext) => {
-                if ext == "oxd" {
+                if ext == "xml" {
                     let mut xml_bytes: Vec<u8> = Vec::new();
                     entry.read_to_end(&mut xml_bytes).await?;
                     let xml_str = from_utf8(&xml_bytes)?;
@@ -113,18 +129,17 @@ pub async fn create_project_using_existing_file<
 
     match oxd_content_opt.take() {
         Some(oxd_content) => {
-            let mut replaced_oxd: OxdXml<SI> = oxd_content.replace_asset(&mut path_id_map);
-
+            let replaced_oxd: OxdXml<SI> = oxd_content.replace_asset(&mut path_id_map);
             for (_, v) in path_id_map {
                 storage
                     .delete(v)
                     .await
                     .map_err(|e| CreateProjectUsingExistingFileError::Storage(e))?;
             }
-            replaced_oxd.clear_id();
-            let created_oxd: OxdXml<SI> = db
-                .create(OxdXml::<SI>::TABLE)
-                .content(replaced_oxd.clone())
+            let replaced_snapshot = Snapshot::new(replaced_oxd);
+            let created_snapshot: Snapshot<SI> = db
+                .create(Snapshot::<SI>::TABLE)
+                .content(replaced_snapshot.clone())
                 .await?;
 
             let branch = Branch::new::<SI>(String::from(DEFAULT_BRANCH), None);
@@ -132,10 +147,10 @@ pub async fn create_project_using_existing_file<
 
             let commit = Commit::new::<SI>(
                 String::from("Initial Commit"),
-                created_branch.id.clone(),
-                Id::String(user_id.clone()),
+                created_branch.id.clone().unwrap(),
+                thing(User::TABLE, user_id.clone()),
                 None,
-                created_oxd.id,
+                created_snapshot.id.unwrap(),
             );
             let _created_commit: Commit = db.create(Commit::TABLE).content(commit).await?;
 
@@ -143,11 +158,11 @@ pub async fn create_project_using_existing_file<
             let slug = file_name_without_sym_spc.to_lowercase().replace("", "-");
 
             let project = Project::new(
-                project_id,
+                thing(Project::TABLE, project_id),
                 String::from(file_name_without_sym_spc),
                 slug,
-                created_branch.id,
-                Id::String(user_id),
+                created_branch.id.unwrap(),
+                thing(User::TABLE, user_id),
             );
             let created_project = db.create(Project::TABLE).content(project).await?;
 
@@ -172,7 +187,7 @@ pub enum GetCurrentTabSnapshotError {
 pub async fn get_current_tab_snapshot_id<D: Connection> (db: Arc<Surreal<D>>, user_id: String) -> Result<String, GetCurrentTabSnapshotError> {
     let mut sessions = db.query("SELECT * FROM type::table($table) WHERE user=type::thing($user_id) AND closed_at IS none ORDER BY last_activity DESC LIMIT 1")
         .bind(("table", Session::TABLE))
-        .bind(("user_id", user_id.clone()))
+        .bind(("user_id", thing(User::TABLE, user_id.clone())))
         .await?;
     let session: Option<Session> = sessions.take(0)?;
 
@@ -217,8 +232,8 @@ pub async fn export_snapshot<
     snapshot_id: String,
 ) -> Result<(), ExportSnapshotError<SE>> {
 
-    let snapshot: Option<OxdXml<SI>> =
-        db.select((OxdXml::<SI>::TABLE, &snapshot_id)).await?;
+    let snapshot: Option<Snapshot<SI>> =
+        db.select((Snapshot::<SI>::TABLE, &snapshot_id)).await?;
 
     if snapshot.is_none() {
         return Err(ExportSnapshotError::NotFound);
@@ -226,10 +241,12 @@ pub async fn export_snapshot<
 
     let snapshot = snapshot.unwrap();
 
-    let storage_objs = snapshot.get_assets();
+    let oxd = snapshot.oxd;
 
-    let xz_encoder = XzEncoder::new(body);
-    let mut tar_builder = Builder::new(xz_encoder);
+    let storage_objs = oxd.get_assets();
+
+    let encoder = Encoder::with_quality(body, async_compression::Level::Best);
+    let mut tar_builder = Builder::new(encoder);
 
     let mut replace: HashMap<SI, PathBuf> = HashMap::new();
     for (i, id) in storage_objs.iter().enumerate() {
@@ -243,7 +260,8 @@ pub async fn export_snapshot<
             .map_err(ExportSnapshotError::Storage)?;
 
         let mut header = Header::new_gnu();
-        let mut path = PathBuf::from("/");
+        header.set_size(info.size);
+        let mut path = PathBuf::from("./");
         if let Some(ext) = info.ext {
             path = path.join(format!("{}.{}", i, &ext));
         }
@@ -253,16 +271,17 @@ pub async fn export_snapshot<
         replace.insert(id.clone(), path);
     }
 
-    let replaced_oxd = snapshot.replace_asset(&mut replace);
+    let replaced_oxd = oxd.replace_asset(&mut replace);
     let xml = xml_to_str(&replaced_oxd)?;
     let xml_bytes = xml.into_bytes();
     let mut xml_bytes_slice = xml_bytes.as_slice();
 
     let mut header = Header::new_gnu();
+    header.set_size(xml_bytes_slice.len() as u64);
     tar_builder
         .append_data(
             &mut header,
-            PathBuf::from("/main.oxd"),
+            PathBuf::from("./oxd.xml"),
             &mut xml_bytes_slice,
         )
         .await?;

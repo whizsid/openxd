@@ -63,13 +63,16 @@ impl Storage<StorageError, PathBuf> for FileSystemStorage {
 
     /// Retrieve the information of a storage object
     async fn info(&self, key: PathBuf) -> Result<StorageObjInfo, StorageError> {
+
+        let metadata = key.metadata()?;
+        let size = metadata.len();
         if let Some(ext_os_str) = key.extension() {
             if let Some(ext_str) = ext_os_str.to_str() {
-                return Ok(StorageObjInfo { ext: Some(String::from(ext_str)) });
+                return Ok(StorageObjInfo { ext: Some(String::from(ext_str)), size });
             }
         }
 
-        Ok(StorageObjInfo { ext: None })
+        Ok(StorageObjInfo { ext: None, size })
     }
 
     /// Duplicating a storage object

@@ -1,24 +1,28 @@
 //! Data structures that using to save data in database
 
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::{Datetime, Id, Thing};
+use surrealdb::sql::{Datetime, Thing, Id};
 
-use crate::{action::AnyAction, oxd::OxdXml, storage::StorageId};
+use crate::{action::AnyAction, storage::{StorageId, StorageIdWithoutSerde}, oxd::OxdXml};
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
-    id: Id,
+    id: Option<Thing>,
     name: String,
 }
 
 impl User {
     pub const TABLE: &str = "users";
+
+    pub fn new(name: String) -> User {
+        User { id: None , name }
+    }
 }
 
 /// Data that should be stored in the database related to a session
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Session {
-    pub id: Id,
+    pub id: Option<Thing>,
     pub user: Thing,
     pub created_at: Datetime,
     pub last_activity: Datetime,
@@ -29,25 +33,19 @@ pub struct Session {
 impl Session {
     pub const TABLE: &str = "sessions";
     /// Creating a session data with an empty to save in DB
-    pub fn create(user_id: Id) -> Session {
+    pub fn create(user: Thing) -> Session {
         Session {
             created_at: Datetime::default(),
             last_activity: Datetime::default(),
             closed_at: None,
-            user: Thing {
-                tb: String::from(User::TABLE),
-                id: user_id,
-            },
-            id: Id::String(String::from("")),
+            user,
+            id: None,
             current_tab: None,
         }
     }
 
-    pub fn set_current_tab(&mut self, tab_id: Id) {
-        self.current_tab = Some(Thing {
-            tb: String::from(Tab::TABLE),
-            id: tab_id,
-        });
+    pub fn set_current_tab(&mut self, tab: Thing) {
+        self.current_tab = Some(tab);
     }
 
     pub fn mark_closed(&mut self) {
@@ -59,7 +57,7 @@ impl Session {
 /// by creating separate tabs. A tab is representing a tab in the editor.
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Tab {
-    pub id: Id,
+    pub id: Option<Thing>,
     /// Users can edit the name of a tab. By default it should similiar to
     /// the project name and branch name
     pub name: String,
@@ -82,32 +80,20 @@ impl Tab {
 
     pub fn new<SI: StorageId>(
         name: String,
-        session_id: Id,
-        head_id: Id,
-        branch_id: Id,
-        snapshot_id: Id,
+        session: Thing,
+        head: Thing,
+        branch: Thing,
+        snapshot: Thing,
     ) -> Tab {
         Tab {
-            id: Id::String(String::new()),
+            id: None,
             name,
-            session: Thing {
-                tb: String::from(Session::TABLE),
-                id: session_id,
-            },
+            session,
             created_at: Datetime::default(),
             exited_at: None,
-            head: Thing {
-                tb: String::from(Commit::TABLE),
-                id: head_id,
-            },
-            branch: Thing {
-                tb: String::from(Branch::TABLE),
-                id: branch_id,
-            },
-            snapshot: Thing {
-                tb: String::from(OxdXml::<SI>::TABLE),
-                id: snapshot_id,
-            },
+            head,
+            branch,
+            snapshot,
         }
     }
 }
@@ -116,7 +102,7 @@ impl Tab {
 /// Users can undo and redo over those actions
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TabAction {
-    pub id: Id,
+    pub id: Option<Thing>,
     /// Tab related to action
     pub tab: Thing,
     pub created_at: Datetime,
@@ -128,7 +114,7 @@ pub struct TabAction {
 /// can stash the pending unsaved actions like in the git.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Stash {
-    pub id: Id,
+    pub id: Option<Thing>,
     /// Tab related to stash
     pub tab: Thing,
     /// Commit that we started to working on
@@ -143,7 +129,7 @@ pub struct Stash {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Project {
-    pub id: Id,
+    pub id: Option<Thing>,
     /// Display name of the project. Can contain spaces, some symbols
     /// and mixed case letters.
     pub name: String,
@@ -160,27 +146,21 @@ pub struct Project {
 impl Project {
     pub const TABLE: &str = "projects";
 
-    pub fn new(id: Id, name: String, slug: String, branch_id: Id, user_id: Id) -> Project {
+    pub fn new(id: Thing, name: String, slug: String, branch: Thing, user: Thing) -> Project {
         Project {
-            id,
+            id: Some(id),
             name,
             slug,
             created_at: Datetime::default(),
-            default_branch: Thing {
-                tb: String::from(Branch::TABLE),
-                id: branch_id,
-            },
-            owner: Thing {
-                tb: String::from(User::TABLE),
-                id: user_id,
-            },
+            default_branch: branch,
+            owner: user,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Branch {
-    pub id: Id,
+    pub id: Option<Thing>,
     /// Name of the branch. This should be a URL friendly word
     pub name: String,
     pub created_at: Datetime,
@@ -190,22 +170,19 @@ pub struct Branch {
 impl Branch {
     pub const TABLE: &str = "branches";
 
-    pub fn new<A: StorageId>(name: String, head: Option<Id>) -> Branch {
+    pub fn new<A: StorageId>(name: String, head: Option<Thing>) -> Branch {
         Branch {
-            id: Id::String(String::new()),
+            id: None,
             name,
             created_at: Datetime::default(),
-            head: head.map(|head_id| Thing {
-                tb: String::from(Commit::TABLE),
-                id: head_id,
-            }),
+            head,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Commit {
-    pub id: Id,
+    pub id: Option<Thing>,
     /// Commit message
     pub message: String,
     pub created_at: Datetime,
@@ -223,31 +200,38 @@ impl Commit {
 
     pub fn new<A: StorageId>(
         message: String,
-        branch_id: Id,
-        user_id: Id,
-        head: Option<Id>,
-        snapshot_id: Id,
+        branch: Thing,
+        user: Thing,
+        head: Option<Thing>,
+        snapshot: Thing,
     ) -> Commit {
         Commit {
-            id: Id::String(String::new()),
+            id: None,
             message,
             created_at: Datetime::default(),
-            branch: Thing {
-                tb: String::from(Branch::TABLE),
-                id: branch_id,
-            },
-            user: Thing {
-                tb: String::from(User::TABLE),
-                id: user_id,
-            },
-            head: head.map(|head_id| Thing {
-                tb: String::from(Commit::TABLE),
-                id: head_id,
-            }),
-            snapshot: Thing {
-                tb: String::from(OxdXml::<A>::TABLE),
-                id: snapshot_id,
-            },
+            branch,
+            user,
+            head,
+            snapshot,
         }
     }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Snapshot<A: StorageIdWithoutSerde> {
+    pub id: Option<Thing>,
+    pub oxd: OxdXml<A>
+}
+
+impl <A: StorageId> Snapshot<A> {
+
+    pub const TABLE: &str = "snapshots";
+
+    pub fn new(oxd: OxdXml<A>) -> Snapshot<A> {
+        Snapshot { id: None , oxd }
+    }
+}
+
+pub fn thing<T: Into<String>, I: Into<Id>>(table: T, id: I) -> Thing {
+    Thing {tb: table.into(), id: id.into()}
 }

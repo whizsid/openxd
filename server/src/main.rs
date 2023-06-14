@@ -13,6 +13,7 @@ use app::{
         create_project_using_existing_file, export_snapshot, get_current_tab_snapshot_id,
         CreateProjectUsingExistingFileError, GetCurrentTabSnapshotError,
     },
+    model::{User, thing, Snapshot},
     App,
 };
 use config::{
@@ -300,7 +301,7 @@ pub async fn ws_open_handler(req: Request<Body>) -> Result<Response<Body>, Error
                     if opened_at.is_some() && !ticket.allow_connect_again {
                         return Err(Error::WebSocketOpen(
                             error::WebSocketOpenError::ExpiredTicket {
-                                ticket_id: ticket.id.to_string(),
+                                ticket_id: ticket.id.unwrap().id.to_string(),
                                 closed_at: ticket.closed_at.unwrap(),
                             },
                         ));
@@ -311,7 +312,7 @@ pub async fn ws_open_handler(req: Request<Body>) -> Result<Response<Body>, Error
                             if opened_at >= closed_at {
                                 return Err(Error::WebSocketOpen(
                                     error::WebSocketOpenError::PendingTicket {
-                                        ticket_id: ticket.id.to_string(),
+                                        ticket_id: ticket.id.unwrap().id.to_string(),
                                         opened_at,
                                     },
                                 ));
@@ -319,7 +320,7 @@ pub async fn ws_open_handler(req: Request<Body>) -> Result<Response<Body>, Error
                         } else {
                             return Err(Error::WebSocketOpen(
                                 error::WebSocketOpenError::PendingTicket {
-                                    ticket_id: ticket.id.to_string(),
+                                    ticket_id: ticket.id.unwrap().id.to_string(),
                                     opened_at,
                                 },
                             ));
@@ -425,7 +426,7 @@ pub async fn oxd_upload_handler(req: Request<Body>) -> Result<Response<Body>, Er
                     )
                     .await
                     .map_err(|e| Error::CreateProject(CreateProjectError::Inner(e)))?;
-                    let project_id_str = project.id.to_string();
+                    let project_id_str = project.id.unwrap().id.to_string();
                     let success_response = OxdUploadSuccessResponse::new(project_id_str);
                     let json_content = to_string(&success_response).unwrap();
                     return Ok(Response::builder()
@@ -508,13 +509,16 @@ pub async fn current_tab_snapshot_handler(
     let user_id = req.context::<UserId>().unwrap();
 
     let snapshot_id = get_current_tab_snapshot_id(db.clone(), user_id.0.clone()).await?;
-    let snapshot_download = SnapshotDownload::new(snapshot_id, user_id.0);
+    let snapshot_download = SnapshotDownload::new(
+        thing(Snapshot::<crate::storage::StorageId>::TABLE, snapshot_id),
+        thing(User::TABLE, user_id.0),
+    );
     let created_download: SnapshotDownload = db
         .create(SnapshotDownload::TABLE)
         .content(snapshot_download)
         .await?;
 
-    let success_response = CurrentTabSnapshotResponse::new(created_download.id.to_string());
+    let success_response = CurrentTabSnapshotResponse::new(created_download.id.unwrap().id.to_string());
     let json_content = to_string(&success_response).unwrap();
     return Ok(Response::builder()
         .status(StatusCode::CREATED)
@@ -544,7 +548,7 @@ pub async fn download_snapshot_handler(
         let mut snapshot_download_cpy = snapshot_download.clone();
         snapshot_download_cpy.mark_as_downloaded();
 
-        db.update((SnapshotDownload::TABLE, snapshot_download_cpy.id.clone()))
+        db.update(snapshot_download_cpy.id.clone().unwrap())
             .content(snapshot_download_cpy)
             .await?;
 

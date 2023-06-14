@@ -10,13 +10,18 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::AsyncRead;
 use std::error::Error as StdError;
 
-pub trait StorageId: Hash + PartialEq + Eq + Serialize + DeserializeOwned + Sync + Send + Clone {}
+pub trait StorageIdWithoutSerde: Hash + PartialEq + Eq + Sync + Send + Clone {}
 
-impl<T> StorageId for T where T: Hash + PartialEq + Eq + Serialize + DeserializeOwned + Sync + Send + Clone {}
+pub trait StorageId: Hash + PartialEq + Eq + Sync + Send + Clone + Serialize  + DeserializeOwned {}
+
+impl<T> StorageId for T where T: Hash + PartialEq + Eq + Serialize + Sync + Send + Clone + DeserializeOwned {}
+impl<T> StorageIdWithoutSerde for T where T: StorageId {}
 
 pub struct StorageObjInfo {
     /// Extension of the file object
-    pub ext: Option<String>
+    pub ext: Option<String>,
+    /// File size in bytes
+    pub size: u64
 }
 
 /// Storage interface to interact with file system

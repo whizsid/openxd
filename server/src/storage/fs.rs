@@ -61,8 +61,12 @@ impl Storage<StorageError, PathBuf> for FileSystemStorage {
                 ext_opt = Some(String::from(ext_str));
             }
         }
+
+        let metadata = key.metadata()?;
+
         Ok(StorageObjInfo {
-            ext: ext_opt
+            ext: ext_opt,
+            size: metadata.len()
         })
     }
 

@@ -1,8 +1,8 @@
-use std::{fmt::Debug, sync::Arc, path::Path};
+use std::{fmt::Debug, path::Path, sync::Arc};
 
 use app::external::{
-    create_project_using_existing_file, get_current_tab_snapshot_id,
-    CreateProjectUsingExistingFileError, GetCurrentTabSnapshotError, export_snapshot, ExportSnapshotError,
+    create_project_using_existing_file, export_snapshot, get_current_tab_snapshot_id,
+    CreateProjectUsingExistingFileError, ExportSnapshotError, GetCurrentTabSnapshotError,
 };
 use async_trait::async_trait;
 use rfd::{AsyncFileDialog, FileHandle};
@@ -10,7 +10,10 @@ use surrealdb::{engine::local::Db, Surreal};
 use tokio::fs::OpenOptions;
 use ui::external::External;
 
-use crate::fs::{FileSystemStorage, StorageError};
+use crate::{
+    fs::{FileSystemStorage, StorageError},
+    USER_ID,
+};
 
 pub struct MockApi {
     db: Arc<Surreal<Db>>,
@@ -33,9 +36,7 @@ impl<SE: Debug + std::error::Error + Send + Sync> From<GetCurrentTabSnapshotErro
     }
 }
 
-impl<SE: Debug + std::error::Error + Send + Sync> From<tokio::io::Error>
-    for MockApiError<SE>
-{
+impl<SE: Debug + std::error::Error + Send + Sync> From<tokio::io::Error> for MockApiError<SE> {
     fn from(value: tokio::io::Error) -> Self {
         MockApiError::Io(value)
     }
@@ -65,7 +66,7 @@ impl External for MockApi {
         file_name: String,
     ) -> Result<String, Self::Error> {
         let mut buf_reader: &[u8] = buf.as_slice();
-        let userid = String::from("currentuser");
+        let userid = String::from(USER_ID);
         let project = create_project_using_existing_file(
             self.db.clone(),
             self.storage.clone(),
@@ -75,23 +76,55 @@ impl External for MockApi {
         )
         .await
         .map_err(MockApiError::CreateProjectUsingExistingFile)?;
-        Ok(project.id.to_string())
+        Ok(project.id.unwrap().id.to_string())
     }
 
     async fn save_current_snapshot(self: Arc<Self>) -> Result<(), Self::Error> {
-        let userid = String::from("currentuser");
+        let userid = String::from(USER_ID);
         let current_snapshot_id = get_current_tab_snapshot_id(self.db.clone(), userid).await?;
         let file_dialog = AsyncFileDialog::new();
-        let choosed_file: Option<FileHandle> = file_dialog
-            .add_filter("OpenXD", &["oxd"])
-            .set_file_name("Untitled Project")
-            .save_file()
-            .await;
+        let choosed_file: Option<FileHandle> =
+            file_dialog.add_filter("OpenXD", &["oxd"]).save_file().await;
 
         if let Some(file_handle) = choosed_file {
             let path: &Path = file_handle.path();
-            let file = OpenOptions::new().write(true).read(true).create(true).truncate(true).open(path).await?;
-            export_snapshot(self.db.clone(), self.storage.clone(), file, current_snapshot_id).await?;
+
+            let extension = path.extension();
+
+            let mut append_extension = false;
+            match extension {
+                Some(ext_str) => match ext_str.to_str() {
+                    Some(ext) if ext == "oxd" => {}
+                    _ => {
+                        append_extension = true;
+                    }
+                },
+                None => {
+                    append_extension = true;
+                }
+            }
+
+            let new_path = if append_extension {
+                path.with_extension("oxd")
+            } else {
+                path.to_path_buf()
+            };
+
+            let file = OpenOptions::new()
+                .write(true)
+                .read(true)
+                .create(true)
+                .truncate(true)
+                .open(new_path)
+                .await?;
+
+            export_snapshot(
+                self.db.clone(),
+                self.storage.clone(),
+                file,
+                current_snapshot_id,
+            )
+            .await?;
         }
 
         Ok(())

@@ -1,10 +1,9 @@
-use app::{model::User, oxd::OxdXml};
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::{Datetime, Id, Thing};
+use surrealdb::sql::{Datetime, Thing};
 
 #[derive(Serialize, Deserialize)]
 pub struct Ticket {
-    pub id: Id,
+    pub id: Option<Thing>,
     pub created_at: Datetime,
     pub opened_at: Option<Datetime>,
     pub closed_at: Option<Datetime>,
@@ -19,7 +18,7 @@ impl Ticket {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SnapshotDownload {
-    pub id: Id,
+    pub id: Option<Thing>,
     pub created_at: Datetime,
     pub snapshot: Thing,
     pub user: Thing,
@@ -27,20 +26,14 @@ pub struct SnapshotDownload {
 }
 
 impl SnapshotDownload {
-    pub const TABLE: &str = "snapshot-downloads" ;
+    pub const TABLE: &str = "snapshot-downloads";
 
-    pub fn new(snapshot_id: String, user_id: String) -> SnapshotDownload {
+    pub fn new(snapshot: Thing, user: Thing) -> SnapshotDownload {
         SnapshotDownload {
-            id: Id::String(String::new()),
+            id: None,
             created_at: Datetime::default(),
-            snapshot: Thing {
-                tb: String::from(OxdXml::<crate::storage::StorageId>::TABLE),
-                id: Id::String(snapshot_id),
-            },
-            user: Thing {
-                tb: String::from(User::TABLE),
-                id: Id::String(user_id),
-            },
+            snapshot,
+            user,
             downloaded_at: None,
         }
     }
