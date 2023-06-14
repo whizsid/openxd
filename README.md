@@ -41,3 +41,5 @@ frontend
 - [x] 'Open File' implementation.
 - [x] `Create Project` implementation.
 - [x] `Save` implementation
+- [ ] Tabs view
+- [ ] Close tab
