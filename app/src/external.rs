@@ -174,10 +174,10 @@ pub enum GetCurrentTabSnapshotError {
     NoTabOpened,
 }
 
-pub async fn get_current_tab_snapshot_id<D: Connection>(
+pub async fn get_current_tab<D: Connection>(
     db: Arc<Surreal<D>>,
     user_id: String,
-) -> Result<String, GetCurrentTabSnapshotError> {
+) -> Result<Tab, GetCurrentTabSnapshotError> {
     let mut sessions = db.query("SELECT * FROM type::table($table) WHERE user=type::thing($user_id) AND closed_at IS none ORDER BY last_activity DESC LIMIT 1")
         .bind(("table", Session::TABLE))
         .bind(("user_id", thing(User::TABLE, user_id.clone())))
@@ -189,7 +189,7 @@ pub async fn get_current_tab_snapshot_id<D: Connection>(
             let tab: Option<Tab> = db.select(current_tab).await?;
             let tab = tab.unwrap();
 
-            Ok(tab.snapshot.id.to_string())
+            Ok(tab)
         } else {
             Err(GetCurrentTabSnapshotError::NoTabOpened)
         }

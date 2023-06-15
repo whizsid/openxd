@@ -10,10 +10,10 @@ use std::{
 
 use app::{
     external::{
-        create_project_using_existing_file, export_snapshot, get_current_tab_snapshot_id,
-        CreateProjectUsingExistingFileError, GetCurrentTabSnapshotError,
+        create_project_using_existing_file, export_snapshot,
+        CreateProjectUsingExistingFileError, GetCurrentTabSnapshotError, get_current_tab,
     },
-    model::{User, thing, Snapshot},
+    model::{thing, User},
     App,
 };
 use config::{
@@ -22,8 +22,9 @@ use config::{
 use error::{AuthError, CreateProjectError, Error, SnapshotDownloadError, WebSocketOpenError};
 use futures::{lock::Mutex, ready, TryStreamExt};
 use hmac::{Hmac, Mac};
-use hyper::{header::CONTENT_TYPE, Body, Request, Response, Server, StatusCode};
-use jwt::VerifyWithKey;
+use hyper::{header::CONTENT_TYPE, Body, Request, Response, Server, StatusCode, Method};
+use jwt::{SignWithKey, VerifyWithKey};
+use log::{info, trace};
 use model::{SnapshotDownload, Ticket};
 use multer::Multipart;
 use querystring::querify;
@@ -77,8 +78,11 @@ static DB: TokioOnceCell<Arc<Surreal<DbClient>>> = TokioOnceCell::const_new();
 
 pub async fn get_db() -> &'static Arc<Surreal<DbClient>> {
     DB.get_or_init(|| async {
+        trace!("Connecting to DB: {}", DB_URL);
         let db = Surreal::new::<DbConnection>(DB_URL).await.unwrap();
+        trace!("Using namespace and DB: {},{}", DB_NAMESPACE, DB_NAME);
         db.use_ns(DB_NAMESPACE).use_db(DB_NAME).await.unwrap();
+        trace!("Authenticating:- {}", DB_USER);
         #[cfg(feature = "db-auth-root")]
         db.signin(RootAuth {
             username: DB_USER,
@@ -120,6 +124,8 @@ pub async fn get_app() -> &'static Mutex<App<DbClient>> {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let service = RouterService::new(router()).expect("Could not create router");
     let socket_addr = SocketAddr::new(
         IpAddr::from_str(WS_HOST).expect("Could not parse WS_HOST value as an IpAddr"),
@@ -130,7 +136,7 @@ async fn main() {
 
     let server = Server::bind(&socket_addr).serve(service);
 
-    println!("App is running on: {}:{}", WS_HOST, WS_PORT);
+    info!("App is running on: {}:{}", WS_HOST, WS_PORT);
     if let Err(err) = server.await {
         eprintln!("Server error: {:?}", err);
     }
@@ -142,12 +148,14 @@ fn router() -> Router<Body, Error<StorageError>> {
         // It will accept websocket connections at `/ws` path with GET method type.
         .get(WS_PATH, ws_open_handler)
         .middleware(enable_cors_all())
+        .middleware(Middleware::pre(logger))
         .middleware(api_auth(&[
             "/api/create-project",
             "/api/current-tab-snapshot",
         ]))
         .post("/api/create-project", oxd_upload_handler)
         .get("/api/current-tab-snapshot", current_tab_snapshot_handler)
+        .get("/api/test-auth", test_auth_handler)
         .get("/api/snapshot/:downloadId", download_snapshot_handler)
         .get("/", |_req| async move {
             Ok(Response::new("I also serve http requests".into()))
@@ -155,6 +163,17 @@ fn router() -> Router<Body, Error<StorageError>> {
         .err_handler(error_handler)
         .build()
         .unwrap()
+}
+
+// A middleware which logs an http request.
+async fn logger(req: Request<Body>) -> Result<Request<Body>, Error<StorageError>> {
+    trace!(
+        "Request:- {} {} {}",
+        req.remote_addr(),
+        req.method(),
+        req.uri().path()
+    );
+    Ok(req)
 }
 
 async fn error_handler(route_err: RouteError) -> Response<Body> {
@@ -244,7 +263,7 @@ pub struct UserId(pub String);
 pub fn api_auth(routes: &'static [&str]) -> Middleware<hyper::Body, Error<StorageError>> {
     Middleware::pre(move |req| async move {
         let uri = req.uri();
-        if routes.contains(&&uri.to_string().as_str()) {
+        if routes.contains(&&uri.to_string().as_str()) && req.method() != &Method::OPTIONS {
             match req.headers().get(hyper::header::AUTHORIZATION) {
                 Some(auth_head) => {
                     let auth_head_str = auth_head
@@ -281,6 +300,56 @@ pub fn api_auth(routes: &'static [&str]) -> Middleware<hyper::Body, Error<Storag
             Ok(req)
         }
     })
+}
+
+#[derive(Serialize)]
+#[cfg(debug_assertions)]
+pub struct TestAuthResponse {
+    ticket: String,
+    token: String,
+}
+
+#[cfg(debug_assertions)]
+pub async fn test_auth_handler(_req: Request<Body>) -> Result<Response<Body>, Error<StorageError>> {
+    let user = User::new_with_id(String::from("testusertestusertest"), String::from("Test User"));
+
+    let db = get_db().await;
+
+    let exist_user: Option<User> = db.select(user.id.clone().unwrap()).await?;
+
+    let user: User = if let Some(exist_user) = exist_user {
+        exist_user
+    } else {
+        db.create(user.id.clone().unwrap()).content(user).await?
+    };
+
+    let key: Hmac<Sha256> = Hmac::new_from_slice(JWT_SECRET.as_bytes())
+        .map_err(|e| Error::Auth(AuthError::InvalidLength(e)))?;
+    let mut claims = BTreeMap::new();
+    claims.insert("sub", user.id.clone().unwrap().id.to_string());
+    let token_str = claims
+        .sign_with_key(&key)
+        .map_err(|e| Error::Auth(AuthError::Jwt(e)))?;
+
+    let ticket = Ticket::new(user.id.unwrap());
+
+    let created_ticket: Ticket = db.create(Ticket::TABLE).content(ticket).await?;
+
+    let response = TestAuthResponse {
+        ticket: created_ticket.id.unwrap().id.to_string(),
+        token: token_str,
+    };
+
+    let json_content = to_string(&response).unwrap();
+    return Ok(Response::builder()
+        .status(StatusCode::CREATED)
+        .body(Body::from(json_content))
+        .unwrap());
+}
+
+#[cfg(not(debug_assertions))]
+pub async fn test_auth_handler(req: Request<Body>) -> Result<Response<Body>, Error<StorageError>> {
+    return Ok(Response::builder().status(StatusCode::NOT_FOUND).body(Body::from("NOT FOUND"))).unwrap();
 }
 
 /// Handling the web socket connections
@@ -508,17 +577,19 @@ pub async fn current_tab_snapshot_handler(
     let db = get_db().await;
     let user_id = req.context::<UserId>().unwrap();
 
-    let snapshot_id = get_current_tab_snapshot_id(db.clone(), user_id.0.clone()).await?;
+    let tab = get_current_tab(db.clone(), user_id.0.clone()).await?;
     let snapshot_download = SnapshotDownload::new(
-        thing(Snapshot::<crate::storage::StorageId>::TABLE, snapshot_id),
+        tab.snapshot,
         thing(User::TABLE, user_id.0),
+        tab.name
     );
     let created_download: SnapshotDownload = db
         .create(SnapshotDownload::TABLE)
         .content(snapshot_download)
         .await?;
 
-    let success_response = CurrentTabSnapshotResponse::new(created_download.id.unwrap().id.to_string());
+    let success_response =
+        CurrentTabSnapshotResponse::new(created_download.id.unwrap().id.to_string());
     let json_content = to_string(&success_response).unwrap();
     return Ok(Response::builder()
         .status(StatusCode::CREATED)
@@ -533,7 +604,7 @@ pub async fn download_snapshot_handler(
     let download_id = req.param("downloadId").unwrap();
 
     let snapshot_download_opt: Option<SnapshotDownload> = db
-        .select((SnapshotDownload::TABLE, download_id.clone()))
+        .select(thing(SnapshotDownload::TABLE, download_id.clone()))
         .await?;
 
     if let Some(snapshot_download) = snapshot_download_opt {
@@ -548,11 +619,12 @@ pub async fn download_snapshot_handler(
         let mut snapshot_download_cpy = snapshot_download.clone();
         snapshot_download_cpy.mark_as_downloaded();
 
-        db.update(snapshot_download_cpy.id.clone().unwrap())
+        let _: Option<SnapshotDownload> = db.update(snapshot_download_cpy.id.clone().unwrap())
             .content(snapshot_download_cpy)
             .await?;
 
         let snapshot_id = snapshot_download.snapshot.id.to_string();
+        let name = snapshot_download.name;
 
         let (sender, body) = Body::channel();
         let sender_writer = SenderWriter::new(sender);
@@ -568,6 +640,7 @@ pub async fn download_snapshot_handler(
         });
         Ok(Response::builder()
             .header("Content-Type", "application/openxd")
+            .header("Content-Disposition", &format!("attachment; filename=\"{}.oxd\"", name))
             .body(body)
             .unwrap())
     } else {

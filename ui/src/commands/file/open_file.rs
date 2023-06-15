@@ -60,6 +60,9 @@ impl<
     }
 
     pub fn cache_opened_file(&mut self, buf: Vec<u8>, file_name: String) {
+        let mut file_name_splitted = file_name.split('.');
+        let file_name = file_name_splitted.next().unwrap();
+        let file_name = String::from(file_name);
         self.app_scope
             .state_mut()
             .set_status_message("Caching the opened file");

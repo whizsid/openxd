@@ -1,7 +1,7 @@
 use std::{fmt::Debug, path::Path, sync::Arc};
 
 use app::external::{
-    create_project_using_existing_file, export_snapshot, get_current_tab_snapshot_id,
+    create_project_using_existing_file, export_snapshot, get_current_tab,
     CreateProjectUsingExistingFileError, ExportSnapshotError, GetCurrentTabSnapshotError,
 };
 use async_trait::async_trait;
@@ -81,10 +81,13 @@ impl External for MockApi {
 
     async fn save_current_snapshot(self: Arc<Self>) -> Result<(), Self::Error> {
         let userid = String::from(USER_ID);
-        let current_snapshot_id = get_current_tab_snapshot_id(self.db.clone(), userid).await?;
+        let current_tab = get_current_tab(self.db.clone(), userid).await?;
         let file_dialog = AsyncFileDialog::new();
-        let choosed_file: Option<FileHandle> =
-            file_dialog.add_filter("OpenXD", &["oxd"]).save_file().await;
+        let choosed_file: Option<FileHandle> = file_dialog
+            .add_filter("OpenXD", &["oxd"])
+            .set_file_name(&current_tab.name)
+            .save_file()
+            .await;
 
         if let Some(file_handle) = choosed_file {
             let path: &Path = file_handle.path();
@@ -122,7 +125,7 @@ impl External for MockApi {
                 self.db.clone(),
                 self.storage.clone(),
                 file,
-                current_snapshot_id,
+                current_tab.snapshot.id.to_string(),
             )
             .await?;
         }

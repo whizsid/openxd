@@ -62,7 +62,9 @@ impl External for RestApi {
                 let form_data = FormData::new()?;
                 let js_arr = Uint8Array::new_with_length(buf.len() as u32);
                 js_arr.copy_from(&buf);
-                let blob = Blob::new_with_u8_array_sequence(&js_arr)?;
+                let js_arr_wrapped = js_sys::Array::new();
+                js_arr_wrapped.push(&js_arr);
+                let blob = Blob::new_with_u8_array_sequence(&js_arr_wrapped)?;
                 form_data.append_with_str("project_name", &project_name)?;
                 form_data.append_with_blob("file", &blob)?;
 
@@ -141,10 +143,7 @@ impl External for RestApi {
 
             let download_id = success_res.download_id;
 
-            win.open_with_url_and_target(
-                &format!("{}/api/snapshot/{}", API_URL, download_id),
-                "_blank",
-            )?;
+            win.open_with_url(&format!("{}/api/snapshot/{}", API_URL, download_id))?;
 
             Ok(())
         } else {

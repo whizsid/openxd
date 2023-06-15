@@ -7,8 +7,8 @@ use crate::{action::AnyAction, storage::{StorageId, StorageIdWithoutSerde}, oxd:
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
-    id: Option<Thing>,
-    name: String,
+    pub id: Option<Thing>,
+    pub name: String,
 }
 
 impl User {
@@ -16,6 +16,10 @@ impl User {
 
     pub fn new(name: String) -> User {
         User { id: None , name }
+    }
+
+    pub fn new_with_id(id: String, name: String) -> User {
+        User { id: Some(thing(User::TABLE, id)), name}
     }
 }
 
