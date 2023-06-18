@@ -4,6 +4,7 @@ pub mod menu;
 pub mod status_bar;
 pub mod dialog_container;
 pub mod windows;
+pub mod tabs;
 
 pub trait UIComponent {
     /// Drawing the UI

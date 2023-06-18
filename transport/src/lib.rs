@@ -5,6 +5,7 @@ use std::{fmt::Debug, marker::PhantomData, pin::Pin};
 
 pub mod app;
 pub mod ui;
+pub mod vo;
 
 #[derive(Debug)]
 pub enum SendError<E: Debug> {

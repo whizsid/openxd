@@ -7,6 +7,8 @@ pub enum UIMessage {
     Error(String),
     OpenFile(String),
     NewProject(String),
+    Resize(u32, u32),
+    CloseTab(String),
 }
 
 #[derive(Clone)]
@@ -60,6 +62,49 @@ impl TryFrom<UIMessage> for NewProjectMessage {
         match value {
             UIMessage::NewProject(project_name) => Ok(NewProjectMessage::new(project_name)),
             _ => Err(()),
+        }
+    }
+}
+
+pub struct ResizeMessage {
+    pub width: u32,
+    pub height: u32
+}
+
+impl Into<UIMessage> for ResizeMessage {
+    fn into(self) -> UIMessage {
+        UIMessage::Resize(self.width, self.height)
+    }
+}
+
+impl TryFrom<UIMessage> for ResizeMessage {
+    type Error = ();
+
+    fn try_from(value: UIMessage) -> Result<Self, Self::Error> {
+        match value {
+            UIMessage::Resize(width, height) => Ok(ResizeMessage { width, height }),
+            _ => Err(())
+        }
+    }
+}
+
+pub struct CloseTabMessage {
+    pub tab_id: String
+}
+
+impl Into<UIMessage> for CloseTabMessage {
+    fn into(self) -> UIMessage {
+        UIMessage::CloseTab(self.tab_id)
+    }
+}
+
+impl TryFrom<UIMessage> for CloseTabMessage {
+    type Error = ();
+
+    fn try_from(value: UIMessage) -> Result<Self, Self::Error> {
+        match value {
+            UIMessage::CloseTab(tab_id) => Ok(CloseTabMessage { tab_id }),
+            _ => Err(())
         }
     }
 }

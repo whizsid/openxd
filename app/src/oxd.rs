@@ -13,14 +13,14 @@ use crate::{
 #[derive(Clone, Serialize, Deserialize)]
 pub struct OxdXml<A: StorageIdWithoutSerde> {
     pub version: String,
-    _phantom: PhantomData<A>,
+    pub screens: Vec<Screen<A>>,
 }
 
 impl<A: StorageId> OxdXml<A> {
     pub fn new() -> OxdXml<A> {
         OxdXml {
             version: String::from(OXD_VERSION),
-            _phantom: PhantomData,
+            screens: vec![]
         }
     }
 }
@@ -31,9 +31,14 @@ impl<A: StorageId, B: StorageId> ReplaceAsset<B> for OxdXml<A> {
     type Output = OxdXml<B>;
 
     fn replace_asset<'a>(self, assets: &'a mut std::collections::HashMap<A, B>) -> Self::Output {
+        let mut new_screens: Vec<Screen<B>> = vec![];
+
+        for old_screen in self.screens {
+            new_screens.push(old_screen.replace_asset(assets));
+        }
         OxdXml {
             version: self.version,
-            _phantom: PhantomData,
+            screens: new_screens 
         }
     }
 }
@@ -41,5 +46,22 @@ impl<A: StorageId, B: StorageId> ReplaceAsset<B> for OxdXml<A> {
 impl<A: StorageId> GetAssets<A> for OxdXml<A> {
     fn get_assets(&self) -> Vec<A> {
         return vec![];
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Screen<A: StorageIdWithoutSerde> {
+    _phantom: PhantomData<A>,
+}
+
+impl<A: StorageId, B: StorageId> ReplaceAsset<B> for Screen<A> {
+    type From = A;
+
+    type Output = Screen<B>;
+
+    fn replace_asset<'a>(self, assets: &'a mut std::collections::HashMap<A, B>) -> Self::Output {
+        Screen {
+            _phantom: PhantomData
+        }
     }
 }

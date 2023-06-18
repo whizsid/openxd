@@ -114,6 +114,8 @@ impl<
         let mut state_mut = self.app_scope.state_mut();
         state_mut.enable_main_ui();
         state_mut.clear_status_message();
+        drop(state_mut);
+        self.app_scope.add_project(tab_created_message.tab_id, tab_created_message.tab_name, tab_created_message.zoom, tab_created_message.screens);
     }
 
     pub fn file_open_failed(&mut self, err: String) {

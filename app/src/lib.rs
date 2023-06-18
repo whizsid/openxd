@@ -146,6 +146,9 @@ impl<
             UIMessage::Ping => {
                 self.client.pong().await.unwrap();
             }
+            UIMessage::Resize(width, height) => {
+                self.resize(width, height);
+            }
             _ => {}
         }
     }
@@ -252,8 +255,11 @@ impl<
             .content(updated_session)
             .await?;
 
+        let zoom: f64 = 0.5;
+
+
         self.client
-            .tab_created(created_tab.name, created_tab.id.unwrap().id.to_string())
+            .tab_created(created_tab.name, created_tab.id.unwrap().id.to_string(), zoom, vec![])
             .await
             .unwrap();
 
@@ -269,6 +275,10 @@ impl<
             .content(session)
             .await
             .unwrap();
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.data.change_size(width, height);
     }
 }
 

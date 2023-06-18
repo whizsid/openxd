@@ -32,6 +32,8 @@ pub struct Session {
     pub last_activity: Datetime,
     pub closed_at: Option<Datetime>,
     pub current_tab: Option<Thing>,
+    /// Pixel size
+    pub screen_size: (u32, u32)
 }
 
 impl Session {
@@ -45,6 +47,7 @@ impl Session {
             user,
             id: None,
             current_tab: None,
+            screen_size: (0, 0)
         }
     }
 
@@ -54,6 +57,10 @@ impl Session {
 
     pub fn mark_closed(&mut self) {
         self.closed_at = Some(Datetime::default());
+    }
+
+    pub fn change_size(&mut self, width: u32, height: u32) {
+        self.screen_size = (width, height);
     }
 }
 

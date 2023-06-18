@@ -1,5 +1,7 @@
 use serde::{Serialize, Deserialize};
 
+use crate::vo::Screen;
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum ApplicationMessage {
     Error(String),
@@ -7,15 +9,18 @@ pub enum ApplicationMessage {
     Pong
 }
 
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TabCreatedMessage {
     pub tab_name: String,
     pub tab_id: String,
+    pub screens: Vec<Screen>,
+    pub zoom: f64,
 }
 
 impl TabCreatedMessage {
-    pub fn new(tab_name: String, tab_id: String) -> TabCreatedMessage {
-        TabCreatedMessage { tab_name, tab_id }
+    pub fn new(tab_name: String, tab_id: String, screens: Vec<Screen>, zoom: f64) -> TabCreatedMessage {
+        TabCreatedMessage { tab_name, tab_id, screens, zoom }
     }
 }
 

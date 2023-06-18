@@ -15,6 +15,7 @@ pub mod ui;
 pub mod components;
 pub mod commands;
 pub mod scopes;
+pub mod tab;
 
 // Infrastructure
 pub mod external;

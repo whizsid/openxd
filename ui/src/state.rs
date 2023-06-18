@@ -1,7 +1,9 @@
 //! UI States
-use std::slice::Iter;
+use std::{slice::Iter, rc::Rc, cell::RefCell};
 
-use crate::commands::Command;
+use transport::vo::Screen;
+
+use crate::{commands::Command, tab::TabInfo};
 
 /// Application wide states
 pub struct AppState {
@@ -15,6 +17,7 @@ pub struct AppState {
     status_message: Option<String>,
     /// Whether that new project dialog opened or not
     new_project_opened: bool,
+    opened_projects: Vec<Rc<RefCell<TabInfo>>>,
 }
 
 impl AppState {
@@ -26,6 +29,7 @@ impl AppState {
             dialog_counter: 0,
             status_message: None,
             new_project_opened: false,
+            opened_projects: vec![]
         }
     }
 
@@ -129,6 +133,21 @@ impl AppState {
     /// Whether that new project window opened or not
     pub fn is_new_project_dialog_opened(&self) -> bool {
         self.new_project_opened
+    }
+
+    /// Adding a project as a tab
+    pub fn add_project(&mut self, id: String, title: String, zoom: f64, screens: Vec<Screen>) {
+        self.opened_projects.push(Rc::new(RefCell::new(TabInfo::new(id, title, zoom, screens))));
+    }
+
+    /// Retrieving a tab by index
+    pub fn tab(&self, index: usize) -> Option<Rc<RefCell<TabInfo>>> {
+        self.opened_projects.get(index).map(|t|t.clone()).clone()
+    }
+
+    /// Returning the opened projects count
+    pub fn tab_count(&self) -> usize {
+        self.opened_projects.len()
     }
 }
 
