@@ -9,7 +9,7 @@ pub struct WebApp {
 
 impl WebApp {
     pub fn new(cc: &CreationContext<'_>, ws: WebSocket) -> WebApp {
-        WebApp { ui:  Ui::new(ws, RestApi::new()) }
+        WebApp { ui:  Ui::new(&cc.egui_ctx, ws, RestApi::new()) }
     }
 }
 

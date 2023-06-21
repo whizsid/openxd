@@ -5,7 +5,8 @@
 
 use std::{fmt::Debug, rc::Rc};
 
-use egui::{CentralPanel, Context, Id, SidePanel, TopBottomPanel};
+use egui::{CentralPanel, Context, Id, SidePanel, TopBottomPanel, FontDefinitions, FontData, FontId, FontFamily, TextStyle};
+use egui_extras::RetainedImage;
 
 use crate::client::ClientTransport;
 use crate::components::dialog_container::DialogContainerComponent;
@@ -16,6 +17,10 @@ use crate::components::windows::create_project_window::CreateProjectWindow;
 use crate::components::{TopLevelUIComponent, UIComponent};
 use crate::external::External;
 use crate::scopes::{ApplicationScope, CreateProjectWindowScope};
+
+pub struct UIIcons {
+    pub draw_rectangle: RetainedImage,
+}
 
 pub struct Ui<
     TE: Debug + Send + 'static,
@@ -42,7 +47,13 @@ impl<
     > Ui<TE, EE, T, E>
 {
     /// Creating the main UI by passing external interfaces
-    pub fn new(transport: T, external_client: E) -> Self {
+    pub fn new(ctx: &Context, transport: T, external_client: E) -> Self {
+
+        let mut fonts = FontDefinitions::default();
+        fonts.font_data.insert("icon-font".to_owned(), FontData::from_static(include_bytes!("../fonts/icons.ttf")));
+        fonts.families.insert(FontFamily::Name("system-ui".into()), vec!["icon-font".into()]);
+        ctx.set_fonts(fonts);
+
         let app_scope = Rc::new(ApplicationScope::new(transport, external_client));
 
         Self {
@@ -88,14 +99,21 @@ impl<
         self.create_project_window.draw(ctx);
 
         SidePanel::left("left-panel").show(ctx, |ui| {
-            let mut tree = self.scope.left_panel_tree();
-            egui_dock::DockArea::new(&mut *tree)
-                .id(Id::new("left-panel-dock"))
-                .style(egui_dock::Style::from_egui(ui.style().as_ref()))
-                .show_inside(ui, &mut self.left_panel_tab_viewer);
-            drop(tree);
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.style_mut().text_styles= [(TextStyle::Button, FontId::new(40.0, FontFamily::Name("system-ui".into())))].into();
+                    if ui.button("!").clicked() {
+                        println!("Clicked");
+                    }
+                });
+                let mut tree = self.scope.left_panel_tree();
+                egui_dock::DockArea::new(&mut *tree)
+                    .id(Id::new("left-panel-dock"))
+                    .style(egui_dock::Style::from_egui(ui.style().as_ref()))
+                    .show_inside(ui, &mut self.left_panel_tab_viewer);
+                drop(tree);
+            });
         });
-
 
         SidePanel::right("right-panel").show(ctx, |ui| {
             let mut tree = self.scope.right_panel_tree();

@@ -21,13 +21,13 @@ pub struct StandaloneApp {
 
 impl StandaloneApp {
     pub fn new(
-        _cc: &CreationContext<'_>,
+        cc: &CreationContext<'_>,
         internal: BiChannel<Vec<u8>, Vec<u8>>,
         db: Arc<Surreal<Db>>,
         storage: Arc<FileSystemStorage>,
     ) -> StandaloneApp {
         StandaloneApp {
-            ui: Ui::new(internal, MockApi::new(db, storage)),
+            ui: Ui::new(&cc.egui_ctx, internal, MockApi::new(db, storage)),
         }
     }
 }
