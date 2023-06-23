@@ -5,12 +5,17 @@
 
 use std::{fmt::Debug, rc::Rc};
 
-use egui::{CentralPanel, Context, Id, SidePanel, TopBottomPanel, FontDefinitions, FontData, FontId, FontFamily, TextStyle};
+use egui::{
+    CentralPanel, Context, FontData, FontDefinitions, FontFamily, FontId, Id, SidePanel, TextStyle,
+    TopBottomPanel,
+};
+use egui_dock::DockArea;
 use egui_extras::RetainedImage;
 
 use crate::client::ClientTransport;
 use crate::components::dialog_container::DialogContainerComponent;
 use crate::components::menu::MenuComponent;
+use crate::components::quick_icons::QuickIconsComponent;
 use crate::components::status_bar::StatusBarComponent;
 use crate::components::tabs::{LeftPanelTabViewer, ProjectsTabViewer, RightPanelTabViewer};
 use crate::components::windows::create_project_window::CreateProjectWindow;
@@ -37,6 +42,7 @@ pub struct Ui<
     tab_viewer: ProjectsTabViewer<TE, EE, T, E>,
     left_panel_tab_viewer: LeftPanelTabViewer<TE, EE, T, E>,
     right_panel_tab_viewer: RightPanelTabViewer<TE, EE, T, E>,
+    quick_icons_component: QuickIconsComponent<TE, EE, T, E>,
 }
 
 impl<
@@ -48,13 +54,20 @@ impl<
 {
     /// Creating the main UI by passing external interfaces
     pub fn new(ctx: &Context, transport: T, external_client: E) -> Self {
-
         let mut fonts = FontDefinitions::default();
-        fonts.font_data.insert("icon-font".to_owned(), FontData::from_static(include_bytes!("../fonts/icons.ttf")));
-        fonts.families.insert(FontFamily::Name("system-ui".into()), vec!["icon-font".into()]);
+        fonts.font_data.insert(
+            "icon-font".to_owned(),
+            FontData::from_static(include_bytes!("../fonts/icons.ttf")),
+        );
+        fonts.families.insert(
+            FontFamily::Name("system-ui".into()),
+            vec!["icon-font".into()],
+        );
         ctx.set_fonts(fonts);
 
         let app_scope = Rc::new(ApplicationScope::new(transport, external_client));
+
+        let quick_icons_component = QuickIconsComponent::new(app_scope.clone(), &ctx.style());
 
         Self {
             scope: app_scope.clone(),
@@ -68,6 +81,7 @@ impl<
             tab_viewer: ProjectsTabViewer::new(app_scope.clone()),
             left_panel_tab_viewer: LeftPanelTabViewer::new(app_scope.clone()),
             right_panel_tab_viewer: RightPanelTabViewer::new(app_scope.clone()),
+            quick_icons_component
         }
     }
 
@@ -99,19 +113,20 @@ impl<
         self.create_project_window.draw(ctx);
 
         SidePanel::left("left-panel").show(ctx, |ui| {
+            let height = ui.available_size().y;
             ui.horizontal(|ui| {
+                ui.set_height(height);
                 ui.vertical(|ui| {
-                    ui.style_mut().text_styles= [(TextStyle::Button, FontId::new(40.0, FontFamily::Name("system-ui".into())))].into();
-                    if ui.button("!").clicked() {
-                        println!("Clicked");
-                    }
+                    self.quick_icons_component.draw(ui);
                 });
-                let mut tree = self.scope.left_panel_tree();
-                egui_dock::DockArea::new(&mut *tree)
-                    .id(Id::new("left-panel-dock"))
-                    .style(egui_dock::Style::from_egui(ui.style().as_ref()))
-                    .show_inside(ui, &mut self.left_panel_tab_viewer);
-                drop(tree);
+                ui.vertical(|ui| {
+                    let mut tree = self.scope.left_panel_tree();
+                    DockArea::new(&mut *tree)
+                        .id(Id::new("left-panel-dock"))
+                        .style(egui_dock::Style::from_egui(ui.style().as_ref()))
+                        .show_inside(ui, &mut self.left_panel_tab_viewer);
+                    drop(tree);
+                });
             });
         });
 
