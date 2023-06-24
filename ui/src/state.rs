@@ -149,6 +149,10 @@ impl AppState {
     pub fn tab_count(&self) -> usize {
         self.opened_projects.len()
     }
+
+    pub fn remove_tab(&mut self, idx: usize) {
+        self.opened_projects.remove(idx);
+    }
 }
 
 /// Severity of dialogs and dialog buttons
@@ -252,10 +256,10 @@ impl AppDialog {
     /// Adding a button to the dialog
     ///
     /// You can set callbacks using the returned `&mut AppDialogButton`
-    pub fn add_button(&mut self, severity: Severity, text: String) -> &mut AppDialogButton {
+    pub fn add_button<T: Into<String>>(&mut self, severity: Severity, text: T) -> &mut AppDialogButton {
         let len_btn = self.buttons.len();
         self.buttons
-            .push(AppDialogButton::new(len_btn, severity, text));
+            .push(AppDialogButton::new(len_btn, severity, text.into()));
         self.buttons.get_mut(len_btn).unwrap()
     }
 

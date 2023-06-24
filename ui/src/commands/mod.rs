@@ -3,6 +3,8 @@
 //! Those commands are triggering from the UI by the user. All the commands are async and
 //! using the `poll_promise` crate to track about the commands.
 pub mod file;
+pub mod tab;
+pub mod nope;
 
 /// Commands should implement this trait
 pub trait Command {

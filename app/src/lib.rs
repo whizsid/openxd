@@ -1,7 +1,7 @@
 use asset::{GetAssets, ReplaceAsset};
 use client::{Client, ClientTransport};
 use helpers::remove_symbols_and_extra_spaces;
-use log::warn;
+use log::{warn, info};
 use oxd::OxdXml;
 use std::error::Error as StdError;
 use std::{collections::HashMap, fmt::Debug, marker::PhantomData, sync::Arc};
@@ -18,7 +18,9 @@ pub mod model;
 pub mod oxd;
 pub mod storage;
 
-use model::{thing, Branch, Commit, Project, Session as SessionModel, Tab, User, Snapshot};
+use model::{
+    thing, Branch, Commit, Project, Session as SessionModel, Snapshot, Tab, TabAction, User,
+};
 
 pub static OXD_VERSION: &str = "0.0.1";
 pub static DEFAULT_BRANCH: &str = "main";
@@ -149,6 +151,9 @@ impl<
             UIMessage::Resize(width, height) => {
                 self.resize(width, height);
             }
+            UIMessage::CloseTab(tab_id) => {
+                self.remove_tab(tab_id).await;
+            }
             _ => {}
         }
     }
@@ -257,9 +262,13 @@ impl<
 
         let zoom: f64 = 0.5;
 
-
         self.client
-            .tab_created(created_tab.name, created_tab.id.unwrap().id.to_string(), zoom, vec![])
+            .tab_created(
+                created_tab.name,
+                created_tab.id.unwrap().id.to_string(),
+                zoom,
+                vec![],
+            )
             .await
             .unwrap();
 
@@ -279,6 +288,25 @@ impl<
 
     pub fn resize(&mut self, width: u32, height: u32) {
         self.data.change_size(width, height);
+    }
+
+    pub async fn remove_tab(&mut self, tab_id: String) {
+        let mut changes_res = self
+            .db
+            .query("SELECT * FROM type::table($tab_action_table) WHERE tab=type::thing($tab)")
+            .bind(("tab_action_table", TabAction::TABLE))
+            .bind(("tab", &tab_id))
+            .await
+            .unwrap();
+        let changes: Vec<TabAction> = changes_res.take(0).unwrap();
+
+        for change in changes {
+            // Remove added assets
+            let _deleted: Option<TabAction> = self.db.delete(change.id.unwrap()).await.unwrap();
+        }
+
+        let _deleted_tab: Option<Tab> = self.db.delete(thing(Tab::TABLE, &tab_id)).await.unwrap();
+        info!("Removed tab:- {}", &tab_id);
     }
 }
 

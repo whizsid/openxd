@@ -1,8 +1,16 @@
 use std::{fmt::Debug, rc::Rc};
 
-use crate::{client::ClientTransport, external::External, scopes::ApplicationScope};
+use crate::{
+    client::ClientTransport, commands::{tab::close_tab::TabCloseCommand, nope::NopeCommand}, external::External,
+    scopes::ApplicationScope, state::Severity,
+};
 
-pub struct ProjectsTabViewer<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> {
+pub struct ProjectsTabViewer<
+    TE: Debug + Send + 'static,
+    EE: Debug + 'static,
+    T: ClientTransport<TE>,
+    E: External<Error = EE>,
+> {
     app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
 }
 
@@ -38,18 +46,61 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
         }
     }
 
-    fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
-        true
+    fn on_close(&mut self, tab_idx: &mut Self::Tab) -> bool {
+        let tab = self.app_scope.state().tab(tab_idx.clone()).unwrap();
+        let mut borrowed_tab = tab.borrow_mut();
+        if borrowed_tab.closing() {
+            return false;
+        }
+        borrowed_tab.set_closing(true);
+        if !borrowed_tab.saved() {
+            let mut state_mut = self.app_scope.state_mut();
+            let dialog = state_mut.add_dialog(
+                Severity::Info,
+                "There are some unsaved changes. Are you sure you want to close this tab?",
+            );
+
+            let cloned_app_scope = self.app_scope.clone();
+            let cloned_tab_idx = tab_idx.clone();
+            drop(borrowed_tab);
+            dialog.add_button(Severity::Error, "Yes").on_click(move || {
+                Box::new(TabCloseCommand::new(
+                    cloned_app_scope,
+                    cloned_tab_idx,
+                ))
+            });
+            let app_scope = self.app_scope.clone();
+            let cloned_tab_idx = tab_idx.clone();
+            dialog.on_close(move || {
+                let state = app_scope.state();
+                let tab = state.tab(cloned_tab_idx).unwrap();
+                let mut borrowed_tab = tab.borrow_mut();
+                borrowed_tab.set_closing(false);
+                Box::new(NopeCommand::new())
+            });
+        } else {
+            drop(borrowed_tab);
+            self.app_scope.execute(TabCloseCommand::new(
+                self.app_scope.clone(),
+                tab_idx.clone(),
+            ));
+        }
+
+        false
     }
 }
 
-
 pub enum LeftPanelTabKind {
     Layers,
-    Components
+    Components,
 }
 
-pub struct LeftPanelTabViewer <TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> {
+pub struct LeftPanelTabViewer<
+    TE: Debug + Send,
+    EE: Debug,
+    T: ClientTransport<TE>,
+    E: External<Error = EE>,
+> {
     app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
 }
 
@@ -71,7 +122,7 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
         match tab {
             LeftPanelTabKind::Layers => "Layers".into(),
-            LeftPanelTabKind::Components => "Components".into()
+            LeftPanelTabKind::Components => "Components".into(),
         }
     }
 }
@@ -80,10 +131,15 @@ pub enum RightPanelTabKind {
     Tool,
     Transform,
     Appearance,
-    Properties
+    Properties,
 }
 
-pub struct RightPanelTabViewer <TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> {
+pub struct RightPanelTabViewer<
+    TE: Debug + Send,
+    EE: Debug,
+    T: ClientTransport<TE>,
+    E: External<Error = EE>,
+> {
     app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
 }
 
@@ -111,4 +167,3 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
         }
     }
 }
-

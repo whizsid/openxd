@@ -6,7 +6,7 @@
 use std::{fmt::Debug, rc::Rc};
 
 use egui::{
-    CentralPanel, Context, FontData, FontDefinitions, FontFamily, FontId, Id, SidePanel, TextStyle,
+    CentralPanel, Context, FontData, FontDefinitions, FontFamily, Id, SidePanel,
     TopBottomPanel,
 };
 use egui_dock::DockArea;

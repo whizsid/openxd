@@ -1,9 +1,13 @@
 //! Data structures that using to save data in database
 
 use serde::{Deserialize, Serialize};
-use surrealdb::sql::{Datetime, Thing, Id};
+use surrealdb::sql::{Datetime, Id, Thing};
 
-use crate::{action::AnyAction, storage::{StorageId, StorageIdWithoutSerde}, oxd::OxdXml};
+use crate::{
+    action::AnyAction,
+    oxd::OxdXml,
+    storage::{StorageId, StorageIdWithoutSerde},
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
@@ -15,11 +19,14 @@ impl User {
     pub const TABLE: &str = "users";
 
     pub fn new(name: String) -> User {
-        User { id: None , name }
+        User { id: None, name }
     }
 
     pub fn new_with_id(id: String, name: String) -> User {
-        User { id: Some(thing(User::TABLE, id)), name}
+        User {
+            id: Some(thing(User::TABLE, id)),
+            name,
+        }
     }
 }
 
@@ -33,7 +40,7 @@ pub struct Session {
     pub closed_at: Option<Datetime>,
     pub current_tab: Option<Thing>,
     /// Pixel size
-    pub screen_size: (u32, u32)
+    pub screen_size: (u32, u32),
 }
 
 impl Session {
@@ -47,7 +54,7 @@ impl Session {
             user,
             id: None,
             current_tab: None,
-            screen_size: (0, 0)
+            screen_size: (0, 0),
         }
     }
 
@@ -119,6 +126,19 @@ pub struct TabAction {
     pub created_at: Datetime,
     /// Action data
     pub action: AnyAction,
+}
+
+impl TabAction {
+    pub const TABLE: &str = "tabactions";
+
+    pub fn new(tab: Thing, action: AnyAction) -> TabAction {
+        TabAction {
+            id: None,
+            tab,
+            created_at: Datetime::default(),
+            action,
+        }
+    }
 }
 
 /// When a user trying to change the branch/ commit in the tab, they
@@ -231,18 +251,20 @@ impl Commit {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Snapshot<A: StorageIdWithoutSerde> {
     pub id: Option<Thing>,
-    pub oxd: OxdXml<A>
+    pub oxd: OxdXml<A>,
 }
 
-impl <A: StorageId> Snapshot<A> {
-
+impl<A: StorageId> Snapshot<A> {
     pub const TABLE: &str = "snapshots";
 
     pub fn new(oxd: OxdXml<A>) -> Snapshot<A> {
-        Snapshot { id: None , oxd }
+        Snapshot { id: None, oxd }
     }
 }
 
 pub fn thing<T: Into<String>, I: Into<Id>>(table: T, id: I) -> Thing {
-    Thing {tb: table.into(), id: id.into()}
+    Thing {
+        tb: table.into(),
+        id: id.into(),
+    }
 }

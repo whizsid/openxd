@@ -91,7 +91,7 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
                                         ui.label(dialog.message());
 
                                         ui.with_layout(Layout::right_to_left(Align::Min), |ui| {
-                                            if ui.button(format!("Close 1")).clicked() {
+                                            if ui.button(format!("Close")).clicked() {
                                                 self.close_button_clicked(dialog.id());
                                             }
                                             for dialog_btn in dialog.iter_buttons() {

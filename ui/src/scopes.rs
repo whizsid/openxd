@@ -3,7 +3,7 @@
 //! Some shared values/interfaces only required for a specific scope (for canvas, for menu bar).
 //! But some values/interfaces are application wide. So we have to redefine what are the required
 //! parameters for each component. Those scopes will avoid those redefinitions.
-use std::{fmt::Debug, marker::PhantomData, sync::Arc, rc::Rc, cell::{RefCell, Ref, RefMut}};
+use std::{fmt::Debug, sync::Arc, rc::Rc, cell::{RefCell, Ref, RefMut}};
 
 use egui_dock::Tree;
 use futures::lock::Mutex;
@@ -17,7 +17,6 @@ pub struct ApplicationScope<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>,
     external_client: Arc<E>,
     command_executor: Rc<RefCell<Executor>>,
     state: Rc<RefCell<AppState>>,
-    _phantom: PhantomData<TE>,
     projects_tree: Rc<RefCell<Tree<usize>>>,
     left_panel_tree: Rc<RefCell<Tree<LeftPanelTabKind>>>,
     right_panel_tree: Rc<RefCell<Tree<RightPanelTabKind>>>
@@ -39,7 +38,6 @@ impl <TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = E
             state: app_state,
             client: arc_client,
             external_client: arc_external_client,
-            _phantom: PhantomData,
             projects_tree: Rc::new(RefCell::new(tree)),
             left_panel_tree: Rc::new(RefCell::new(left_panel_tree)),
             right_panel_tree: Rc::new(RefCell::new(right_panel_tree))
@@ -101,6 +99,15 @@ impl <TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = E
 
     pub fn right_panel_tree(&self) -> RefMut<'_, Tree<RightPanelTabKind>> {
         self.right_panel_tree.borrow_mut()
+    }
+
+    pub fn remove_tab(&self, tab_idx: usize) {
+        let mut projects_tree = self.projects_tree.borrow_mut();
+        let tab_loc = projects_tree.find_tab(&tab_idx).unwrap();
+        projects_tree.remove_tab(tab_loc);
+
+        let mut state_mut = self.state_mut();
+        state_mut.remove_tab(tab_idx);
     }
 }
 

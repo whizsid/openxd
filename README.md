@@ -42,5 +42,5 @@ frontend
 - [x] `Create Project` implementation.
 - [x] `Save` implementation
 - [x] Tabs view
-- [ ] Close tab
+- [x] Close tab
 - [ ] Create a Canvas

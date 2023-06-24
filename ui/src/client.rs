@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 
 use futures::{Sink, Stream};
 use transport::app::{ApplicationMessage, TabCreatedMessage};
-use transport::ui::{NewProjectMessage, OpenFileMessage, UIMessage};
-use transport::{Client as InternalClient, SendAndReceiveError};
+use transport::ui::{NewProjectMessage, OpenFileMessage, UIMessage, CloseTabMessage};
+use transport::{Client as InternalClient, SendAndReceiveError, SendError};
 
 /// Trait constraints to internal transport of the `Client`
 pub trait ClientTransport<E: Debug + Send>:
@@ -82,5 +82,9 @@ impl<E: Debug + Send, T: ClientTransport<E>> Client<E, T> {
                 NewProjectMessage::new(project_name),
             )
             .await
+    }
+
+    pub async fn close_tab(&mut self, tab_id: String) -> Result<(), SendError<E>> {
+        self.internal.send(CloseTabMessage::new(tab_id)).await
     }
 }

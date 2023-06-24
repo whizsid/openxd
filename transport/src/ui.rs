@@ -92,6 +92,12 @@ pub struct CloseTabMessage {
     pub tab_id: String
 }
 
+impl CloseTabMessage {
+    pub fn new(tab_id: String) -> CloseTabMessage {
+        CloseTabMessage { tab_id }
+    }
+}
+
 impl Into<UIMessage> for CloseTabMessage {
     fn into(self) -> UIMessage {
         UIMessage::CloseTab(self.tab_id)
