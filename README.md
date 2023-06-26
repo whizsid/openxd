@@ -43,4 +43,8 @@ frontend
 - [x] `Save` implementation
 - [x] Tabs view
 - [x] Close tab
-- [ ] Create a Canvas
+- [x] Create a Canvas
+- [ ] Choose default screen size in project creation
+- [ ] Display screen sizes list when right click on the add screen button
+- [ ] Draw Screens
+- [ ] Implementing a manual scrollbar

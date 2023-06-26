@@ -1,9 +1,13 @@
-use std::{fmt::Debug, rc::Rc};
+use std::{fmt::Debug, rc::Rc, sync::Arc};
+
+use egui::Frame;
 
 use crate::{
     client::ClientTransport, commands::{tab::close_tab::TabCloseCommand, nope::NopeCommand}, external::External,
     scopes::ApplicationScope, state::Severity,
 };
+
+use super::{canvas::CanvasComponent, UIComponent};
 
 pub struct ProjectsTabViewer<
     TE: Debug + Send + 'static,
@@ -12,13 +16,19 @@ pub struct ProjectsTabViewer<
     E: External<Error = EE>,
 > {
     app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+    canvas_component: CanvasComponent,
+    last_tab: usize,
 }
 
 impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
     ProjectsTabViewer<TE, EE, T, E>
 {
-    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>) -> ProjectsTabViewer<TE, EE, T, E> {
-        ProjectsTabViewer { app_scope }
+    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>, gl: Arc<glow::Context>) -> ProjectsTabViewer<TE, EE, T, E> {
+        ProjectsTabViewer { app_scope, canvas_component: CanvasComponent::new(gl), last_tab: 0 }
+    }
+
+    pub fn exit(&mut self, gl: Option<&glow::Context>) {
+        self.canvas_component.exit(gl);
     }
 }
 
@@ -27,7 +37,17 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
 {
     type Tab = usize;
 
-    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {}
+    fn ui(&mut self, ui: &mut egui::Ui, tab_idx: &mut Self::Tab) {
+        let tab = self.app_scope.state().tab(*tab_idx);
+        if self.last_tab != *tab_idx {
+            if let Some(_tab) = tab {
+                self.canvas_component.change_tab(*tab_idx);
+            }
+        }
+        Frame::canvas(ui.style()).show(ui, |ui| {
+            self.canvas_component.draw(ui);
+        });
+    }
 
     fn title(&mut self, i: &mut Self::Tab) -> egui::WidgetText {
         let tab_found = self.app_scope.state().tab(i.clone());

@@ -84,10 +84,14 @@ async fn main() {
             }
         }
     });
-    let native_options = NativeOptions::default();
+    let options = NativeOptions {
+        multisampling: 4,
+        renderer: eframe::Renderer::Glow,
+        ..Default::default()
+    };
     run_native(
         "OpenXD",
-        native_options,
+        options,
         Box::new(move |cc| Box::new(StandaloneApp::new(cc, uichannel, db.clone(), fs.clone()))),
     )
     .unwrap();

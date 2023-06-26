@@ -3,6 +3,7 @@
 //! All the components defined in `components` module should be linked
 //! here.
 
+use std::sync::Arc;
 use std::{fmt::Debug, rc::Rc};
 
 use egui::{
@@ -53,7 +54,7 @@ impl<
     > Ui<TE, EE, T, E>
 {
     /// Creating the main UI by passing external interfaces
-    pub fn new(ctx: &Context, transport: T, external_client: E) -> Self {
+    pub fn new(ctx: &Context, gl: Arc<glow::Context>, transport: T, external_client: E) -> Self {
         let mut fonts = FontDefinitions::default();
         fonts.font_data.insert(
             "icon-font".to_owned(),
@@ -78,11 +79,15 @@ impl<
                 CreateProjectWindowScope::new(app_scope.client()),
                 app_scope.clone(),
             ),
-            tab_viewer: ProjectsTabViewer::new(app_scope.clone()),
+            tab_viewer: ProjectsTabViewer::new(app_scope.clone(), gl),
             left_panel_tab_viewer: LeftPanelTabViewer::new(app_scope.clone()),
             right_panel_tab_viewer: RightPanelTabViewer::new(app_scope.clone()),
             quick_icons_component
         }
+    }
+
+    pub fn exit(&mut self, gl: Option<&glow::Context>) {
+        self.tab_viewer.exit(gl);
     }
 
     /// Updating the components and command statuses in a one iteration in event loop.

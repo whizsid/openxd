@@ -52,7 +52,7 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
         let button_padding = &mut ui.spacing_mut().button_padding;
         button_padding.x = 8.0;
         button_padding.y = 0.0;
-        if ui.button(" ").clicked() {
+        if ui.button("\"").clicked() {
             println!("Clicked");
         }
     }
