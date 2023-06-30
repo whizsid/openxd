@@ -1,33 +1,23 @@
-use std::{fmt::Debug, rc::Rc, collections::BTreeMap};
+use std::collections::BTreeMap;
 
 use egui::{Color32, FontFamily, FontId, Rgba, Rounding, Style, TextStyle};
 
-use crate::{client::ClientTransport, external::External, scopes::ApplicationScope};
+use crate::scopes::ApplicationScope;
 
 use super::UIComponent;
 
-pub struct QuickIconsComponent<
-    TE: Debug + Send,
-    EE: Debug,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct QuickIconsComponent {
+    _app_scope: ApplicationScope,
     bg_fill: Color32,
     rounding: Rounding,
     text_style: BTreeMap<TextStyle, FontId>,
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    QuickIconsComponent<TE, EE, T, E>
-{
-    pub fn new(
-        app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
-        style: &Style,
-    ) -> QuickIconsComponent<TE, EE, T, E> {
+impl QuickIconsComponent {
+    pub fn new(app_scope: ApplicationScope, style: &Style) -> QuickIconsComponent {
         let bg_fill = (Rgba::from(style.visuals.window_fill()) * Rgba::from_gray(0.7)).into();
         QuickIconsComponent {
-            app_scope,
+            _app_scope: app_scope,
             bg_fill,
             rounding: Rounding::default(),
             text_style: [(
@@ -39,9 +29,7 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
     }
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> UIComponent
-    for QuickIconsComponent<TE, EE, T, E>
-{
+impl UIComponent for QuickIconsComponent {
     fn draw(&mut self, ui: &mut egui::Ui) {
         let mut rect = ui.max_rect();
         let min_x = rect.min.x;

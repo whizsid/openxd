@@ -28,6 +28,12 @@ pub enum MockApiError<SE: Debug + std::error::Error + Send + Sync> {
     Io(tokio::io::Error),
 }
 
+impl<SE: Debug + std::error::Error + Send + Sync> From<MockApiError<SE>> for String {
+    fn from(value: MockApiError<SE>) -> Self {
+        format!("{:?}", value)
+    }
+}
+
 impl<SE: Debug + std::error::Error + Send + Sync> From<GetCurrentTabSnapshotError>
     for MockApiError<SE>
 {
@@ -58,13 +64,11 @@ impl MockApi {
 
 #[async_trait]
 impl External for MockApi {
-    type Error = MockApiError<StorageError>;
-
     async fn create_project_using_existing_file(
-        self: Arc<Self>,
+        &self,
         buf: Vec<u8>,
         file_name: String,
-    ) -> Result<String, Self::Error> {
+    ) -> Result<String, String> {
         let mut buf_reader: &[u8] = buf.as_slice();
         let userid = String::from(USER_ID);
         let project = create_project_using_existing_file(
@@ -79,9 +83,11 @@ impl External for MockApi {
         Ok(project.id.unwrap().id.to_string())
     }
 
-    async fn save_current_snapshot(self: Arc<Self>) -> Result<(), Self::Error> {
+    async fn save_current_snapshot(&self) -> Result<(), String> {
         let userid = String::from(USER_ID);
-        let current_tab = get_current_tab(self.db.clone(), userid).await?;
+        let current_tab = get_current_tab(self.db.clone(), userid)
+            .await
+            .map_err(MockApiError::<StorageError>::from)?;
         let file_dialog = AsyncFileDialog::new();
         let choosed_file: Option<FileHandle> = file_dialog
             .add_filter("OpenXD", &["oxd"])
@@ -119,7 +125,8 @@ impl External for MockApi {
                 .create(true)
                 .truncate(true)
                 .open(new_path)
-                .await?;
+                .await
+                .map_err(MockApiError::<StorageError>::from)?;
 
             export_snapshot(
                 self.db.clone(),
@@ -127,7 +134,8 @@ impl External for MockApi {
                 file,
                 current_tab.snapshot.id.to_string(),
             )
-            .await?;
+            .await
+            .map_err(MockApiError::<StorageError>::from)?;
         }
 
         Ok(())

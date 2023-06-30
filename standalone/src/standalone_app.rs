@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use eframe::{App, CreationContext};
 use surrealdb::{engine::local::Db, Surreal};
-use ui::ui::Ui;
+use ui::{ui::Ui, client::ClientImpl};
 
 use crate::{
     bichannel::{BiChannel, BiChannelError},
@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub struct StandaloneApp {
-    ui: Ui<BiChannelError, MockApiError<StorageError>, BiChannel<Vec<u8>, Vec<u8>>, MockApi>,
+    ui: Ui,
 }
 
 impl StandaloneApp {
@@ -21,9 +21,11 @@ impl StandaloneApp {
         db: Arc<Surreal<Db>>,
         storage: Arc<FileSystemStorage>,
     ) -> StandaloneApp {
+        let client = ClientImpl::new(internal);
+        let external = MockApi::new(db, storage);
         let gl = cc.gl.clone().unwrap();
         StandaloneApp {
-            ui: Ui::new(&cc.egui_ctx, gl, internal, MockApi::new(db, storage)),
+            ui: Ui::new(&cc.egui_ctx, gl, Box::new(client), Box::new(external)),
         }
     }
 }

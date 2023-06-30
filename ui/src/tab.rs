@@ -3,16 +3,16 @@ use transport::vo::Screen;
 pub struct TabInfo {
     id: String,
     title: String,
-    zoom: f64,
-    mode: Mode,
-    screens: Vec<Screen>,
+    _zoom: f64,
+    _mode: Mode,
+    _screens: Vec<Screen>,
     saved: bool,
     closing: bool,
 }
 
 impl TabInfo {
     pub fn new(id: String, title: String, zoom: f64, screens: Vec<Screen>) -> TabInfo {
-        TabInfo { id, title, zoom, mode: Mode::Design, screens, saved: false, closing: false}
+        TabInfo { id, title, _zoom: zoom, _mode: Mode::Design, _screens: screens, saved: false, closing: false}
     }
 
     pub fn id(&self) -> String {

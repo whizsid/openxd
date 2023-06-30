@@ -4,16 +4,14 @@
 //! here.
 
 use std::sync::Arc;
-use std::{fmt::Debug, rc::Rc};
 
 use egui::{
-    CentralPanel, Context, FontData, FontDefinitions, FontFamily, Id, SidePanel,
-    TopBottomPanel,
+    CentralPanel, Context, FontData, FontDefinitions, FontFamily, Id, SidePanel, TopBottomPanel,
 };
 use egui_dock::DockArea;
-use egui_extras::RetainedImage;
+use futures::lock::Mutex;
 
-use crate::client::ClientTransport;
+use crate::client::Client;
 use crate::components::dialog_container::DialogContainerComponent;
 use crate::components::menu::MenuComponent;
 use crate::components::quick_icons::QuickIconsComponent;
@@ -24,37 +22,27 @@ use crate::components::{TopLevelUIComponent, UIComponent};
 use crate::external::External;
 use crate::scopes::{ApplicationScope, CreateProjectWindowScope};
 
-pub struct UIIcons {
-    pub draw_rectangle: RetainedImage,
-}
-
-pub struct Ui<
-    TE: Debug + Send + 'static,
-    EE: Debug + 'static,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct Ui {
+    scope: ApplicationScope,
     // Componentes
-    menu_component: MenuComponent<TE, EE, T, E>,
-    status_bar_component: StatusBarComponent<TE, EE, T, E>,
-    dialog_container_component: DialogContainerComponent<TE, EE, T, E>,
-    create_project_window: CreateProjectWindow<TE, EE, T, E>,
-    tab_viewer: ProjectsTabViewer<TE, EE, T, E>,
-    left_panel_tab_viewer: LeftPanelTabViewer<TE, EE, T, E>,
-    right_panel_tab_viewer: RightPanelTabViewer<TE, EE, T, E>,
-    quick_icons_component: QuickIconsComponent<TE, EE, T, E>,
+    menu_component: MenuComponent,
+    status_bar_component: StatusBarComponent,
+    dialog_container_component: DialogContainerComponent,
+    create_project_window: CreateProjectWindow,
+    tab_viewer: ProjectsTabViewer,
+    left_panel_tab_viewer: LeftPanelTabViewer,
+    right_panel_tab_viewer: RightPanelTabViewer,
+    quick_icons_component: QuickIconsComponent,
 }
 
-impl<
-        TE: Debug + Send + 'static,
-        EE: Debug + 'static,
-        T: ClientTransport<TE>,
-        E: External<Error = EE>,
-    > Ui<TE, EE, T, E>
-{
+impl Ui {
     /// Creating the main UI by passing external interfaces
-    pub fn new(ctx: &Context, gl: Arc<glow::Context>, transport: T, external_client: E) -> Self {
+    pub fn new(
+        ctx: &Context,
+        gl: Arc<glow::Context>,
+        client: Box<dyn Client + 'static>,
+        external_client: Box<dyn External + 'static>,
+    ) -> Self {
         let mut fonts = FontDefinitions::default();
         fonts.font_data.insert(
             "icon-font".to_owned(),
@@ -66,23 +54,26 @@ impl<
         );
         ctx.set_fonts(fonts);
 
-        let app_scope = Rc::new(ApplicationScope::new(transport, external_client));
+        let app_scope = ApplicationScope::new(
+                    Arc::new(Mutex::new(client)),
+                    Arc::new(external_client)
+                );
 
         let quick_icons_component = QuickIconsComponent::new(app_scope.clone(), &ctx.style());
 
         Self {
-            scope: app_scope.clone(),
             menu_component: MenuComponent::new(app_scope.clone()),
             status_bar_component: StatusBarComponent::new(app_scope.clone()),
             dialog_container_component: DialogContainerComponent::new(app_scope.clone()),
             create_project_window: CreateProjectWindow::new(
-                CreateProjectWindowScope::new(app_scope.client()),
+                CreateProjectWindowScope::new(),
                 app_scope.clone(),
             ),
             tab_viewer: ProjectsTabViewer::new(app_scope.clone(), gl),
             left_panel_tab_viewer: LeftPanelTabViewer::new(app_scope.clone()),
             right_panel_tab_viewer: RightPanelTabViewer::new(app_scope.clone()),
-            quick_icons_component
+            quick_icons_component,
+            scope: app_scope,
         }
     }
 
@@ -130,7 +121,6 @@ impl<
                         .id(Id::new("left-panel-dock"))
                         .style(egui_dock::Style::from_egui(ui.style().as_ref()))
                         .show_inside(ui, &mut self.left_panel_tab_viewer);
-                    drop(tree);
                 });
             });
         });
@@ -141,7 +131,6 @@ impl<
                 .id(Id::new("right-panel-dock"))
                 .style(egui_dock::Style::from_egui(ui.style().as_ref()))
                 .show_inside(ui, &mut self.right_panel_tab_viewer);
-            drop(tree);
         });
 
         CentralPanel::default().show(ctx, |ui| {
@@ -152,7 +141,6 @@ impl<
                     .draggable_tabs(false)
                     .style(egui_dock::Style::from_egui(ui.style().as_ref()))
                     .show_inside(ui, &mut self.tab_viewer);
-                drop(projects_tree);
             })
         });
     }

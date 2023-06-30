@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use eframe::CreationContext;
-use ui::ui::Ui;
+use futures::lock::Mutex;
+use ui::{ui::Ui, client::{ClientImpl, Client}};
 
 use crate::{
     rest_api::{RestApi, RestApiError},
@@ -7,14 +10,16 @@ use crate::{
 };
 
 pub struct WebApp {
-    ui: Ui<WebSocketError, RestApiError, WebSocket, RestApi>,
+    ui: Ui,
 }
 
 impl WebApp {
     pub fn new(cc: &CreationContext<'_>, ws: WebSocket) -> WebApp {
+        let client = Box::new(ClientImpl::new(ws));
+        let external = Box::new(RestApi::new());
         let gl = cc.gl.clone().unwrap();
         WebApp {
-            ui: Ui::new(&cc.egui_ctx, gl, ws, RestApi::new()),
+            ui: Ui::new(&cc.egui_ctx, gl, client, external),
         }
     }
 }

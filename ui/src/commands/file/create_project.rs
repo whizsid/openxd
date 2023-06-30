@@ -1,46 +1,32 @@
-use std::{fmt::Debug, rc::Rc};
-
 use poll_promise::Promise;
 use transport::{app::TabCreatedMessage, vo::Screen};
 
 use crate::{
-    client::ClientTransport, commands::Command, external::External, scopes::ApplicationScope,
+    commands::Command, scopes::ApplicationScope,
 };
 
-pub struct CreateProjectCommand<
-    TE: Debug + Send + 'static,
-    EE: Debug,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct CreateProjectCommand {
+    app_scope: ApplicationScope,
     create_project_promise: Promise<Result<TabCreatedMessage, String>>,
 }
 
-impl<TE: Debug + Send + 'static, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    CreateProjectCommand<TE, EE, T, E>
-{
+impl CreateProjectCommand {
     pub fn new(
-        app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+        app_scope: ApplicationScope,
         project_name: String,
-    ) -> CreateProjectCommand<TE, EE, T, E> {
-        let client = app_scope.client();
+    ) -> CreateProjectCommand {
         app_scope
             .state_mut()
             .set_status_message(format!("Creating Project: {}", &project_name));
+
+        let client = app_scope.client();
 
         CreateProjectCommand {
             app_scope,
             create_project_promise: Promise::spawn_async(async move {
                 let mut client_locked = client.lock().await;
                 let result = client_locked.create_new_project(project_name).await;
-                match result {
-                    Ok(res) => match res.into() {
-                        Ok(success) => Ok(success),
-                        Err(err) => Err(format!("Remote: {}", err)),
-                    },
-                    Err(err) => Err(format!("{:?}", err)),
-                }
+                result.map_err(|e|format!("{:?}", e))
             }),
         }
     }
@@ -52,14 +38,11 @@ impl<TE: Debug + Send + 'static, EE: Debug, T: ClientTransport<TE>, E: External<
         zoom: f64,
         screens: Vec<Screen>,
     ) {
-        self.app_scope
-            .add_project(tab_id, tab_name, zoom, screens);
+        self.app_scope.add_project(tab_id, tab_name, zoom, screens);
     }
 }
 
-impl<TE: Debug + Send + 'static, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> Command
-    for CreateProjectCommand<TE, EE, T, E>
-{
+impl Command for CreateProjectCommand {
     fn update(&mut self) -> bool {
         if let Some(res) = self.create_project_promise.ready() {
             match res {
@@ -76,7 +59,6 @@ impl<TE: Debug + Send + 'static, EE: Debug, T: ClientTransport<TE>, E: External<
                     let mut state_mut = self.app_scope.state_mut();
                     state_mut.add_dialog(crate::state::Severity::Error, e);
                     state_mut.clear_status_message();
-                    drop(state_mut);
                 }
             }
             true

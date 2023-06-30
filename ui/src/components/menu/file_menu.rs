@@ -1,47 +1,34 @@
-use std::{fmt::Debug, rc::Rc};
-
 use egui::Ui;
 
 use crate::{
-    client::ClientTransport, commands::file::{open_file::FileOpenCommand, save_snapshot::SaveSnapshotCommand}, components::UIComponent,
-    external::External, scopes::ApplicationScope,
+    commands::file::{open_file::FileOpenCommand, save_snapshot::SaveSnapshotCommand},
+    components::UIComponent,
+    scopes::ApplicationScope,
 };
 
 pub enum FileMenuComponentEvent {
     OpenFileClicked,
     NewProjectClicked,
-    SaveClicked
+    SaveClicked,
 }
 
-pub struct FileMenuComponent<
-    TE: Debug + Send + 'static,
-    EE: Debug + 'static,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct FileMenuComponent {
+    app_scope: ApplicationScope,
 }
 
-impl<
-        TE: Debug + Send + 'static,
-        EE: Debug + 'static,
-        T: ClientTransport<TE>,
-        E: External<Error = EE>,
-    > FileMenuComponent<TE, EE, T, E>
-{
-    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>) -> Self {
+impl FileMenuComponent {
+    pub fn new(app_scope: ApplicationScope) -> Self {
         FileMenuComponent { app_scope }
     }
 
     pub fn on(&mut self, event: FileMenuComponentEvent) {
         match event {
             FileMenuComponentEvent::OpenFileClicked => {
-                self.app_scope
-                    .execute(FileOpenCommand::new(self.app_scope.clone()));
-            },
+                self.app_scope.execute(FileOpenCommand::new(self.app_scope.clone()));
+            }
             FileMenuComponentEvent::NewProjectClicked => {
-                self.app_scope.state_mut().open_new_project_dialog();
-            },
+                self.app_scope.state_mut().create_project_window_mut().open();
+            }
             FileMenuComponentEvent::SaveClicked => {
                 self.app_scope.execute(SaveSnapshotCommand::new(self.app_scope.clone()));
             }
@@ -49,13 +36,7 @@ impl<
     }
 }
 
-impl<
-        TE: Debug + Send + 'static,
-        EE: Debug + 'static,
-        T: ClientTransport<TE>,
-        E: External<Error = EE>,
-    > UIComponent for FileMenuComponent<TE, EE, T, E>
-{
+impl UIComponent for FileMenuComponent {
     fn draw(&mut self, ui: &mut Ui) {
         ui.menu_button("File", |ui| {
             if ui.button("Open").clicked() {

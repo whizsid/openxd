@@ -23,7 +23,6 @@ rfd = "^0.11"
 log = "^0.4"
 
 [features]
-default = ["db-rocksdb"]
-db-tikv = ["surrealdb/kv-tikv"]
+default = ["db-mem"]
 db-rocksdb = ["surrealdb/kv-rocksdb"]
 db-mem = ["surrealdb/kv-mem"]

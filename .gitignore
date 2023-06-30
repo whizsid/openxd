@@ -9,5 +9,6 @@ server/target
 transport/target
 standalone/target
 web/target
+rust-gpu
 .env
 .DS_Store

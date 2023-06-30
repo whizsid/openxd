@@ -3,49 +3,59 @@
 //! Some shared values/interfaces only required for a specific scope (for canvas, for menu bar).
 //! But some values/interfaces are application wide. So we have to redefine what are the required
 //! parameters for each component. Those scopes will avoid those redefinitions.
-use std::{fmt::Debug, sync::Arc, rc::Rc, cell::{RefCell, Ref, RefMut}};
+use std::{sync::Arc, cell::{RefCell, Ref, RefMut}, rc::Rc};
 
 use egui_dock::Tree;
 use futures::lock::Mutex;
 use transport::vo::Screen;
 
-use crate::{client::{ClientTransport, Client}, external::External, commands::{Executor, Command}, state::{AppState, CreateProjectWindowState}, tab::TabInfo, components::tabs::{LeftPanelTabKind, RightPanelTabKind}};
+use crate::{
+    client::Client,
+    commands::{Command, Executor},
+    components::tabs::{LeftPanelTabKind, RightPanelTabKind},
+    external::External,
+    state::{AppState, CreateProjectWindowState},
+};
 
 /// Application wide scope
-pub struct ApplicationScope<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> {
-    client: Arc<Mutex<Client<TE, T>>>,
-    external_client: Arc<E>,
+#[derive(Clone)]
+pub struct ApplicationScope {
+    client: Arc<Mutex<Box<dyn Client>>>,
+    external_client: Arc<Box<dyn External>>,
     command_executor: Rc<RefCell<Executor>>,
     state: Rc<RefCell<AppState>>,
     projects_tree: Rc<RefCell<Tree<usize>>>,
     left_panel_tree: Rc<RefCell<Tree<LeftPanelTabKind>>>,
-    right_panel_tree: Rc<RefCell<Tree<RightPanelTabKind>>>
+    right_panel_tree: Rc<RefCell<Tree<RightPanelTabKind>>>,
 }
 
-impl <TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> ApplicationScope<TE, EE, T, E> {
-    pub fn new(transport: T ,external_client: E) -> ApplicationScope<TE, EE, T, E> {
-        let command_executor = Rc::new(RefCell::new(Executor::new()));
-        let arc_client = Arc::new(Mutex::new(Client::new(transport)));
-        let arc_external_client = Arc::new(external_client);
-        let app_state = Rc::new(RefCell::new(AppState::new()));
-
+impl ApplicationScope {
+    pub fn new(
+        client: Arc<Mutex<Box<dyn Client>>>,
+        external_client: Arc<Box<dyn External>>,
+    ) -> ApplicationScope {
         let tree = Tree::new(vec![]);
-        let left_panel_tree = Tree::new(vec![LeftPanelTabKind::Layers, LeftPanelTabKind::Components]);
-        let right_panel_tree = Tree::new(vec![RightPanelTabKind::Tool, RightPanelTabKind::Appearance, RightPanelTabKind::Properties]);
+        let left_panel_tree =
+            Tree::new(vec![LeftPanelTabKind::Layers, LeftPanelTabKind::Components]);
+        let right_panel_tree = Tree::new(vec![
+            RightPanelTabKind::Tool,
+            RightPanelTabKind::Appearance,
+            RightPanelTabKind::Properties,
+        ]);
 
         ApplicationScope {
-            command_executor,
-            state: app_state,
-            client: arc_client,
-            external_client: arc_external_client,
+            client,
+            external_client,
+            command_executor: Rc::new(RefCell::new(Executor::new())),
+            state: Rc::new(RefCell::new(AppState::new())),
             projects_tree: Rc::new(RefCell::new(tree)),
             left_panel_tree: Rc::new(RefCell::new(left_panel_tree)),
-            right_panel_tree: Rc::new(RefCell::new(right_panel_tree))
+            right_panel_tree: Rc::new(RefCell::new(right_panel_tree)),
         }
     }
 
     /// Getter for a non mutable reference to application wide state
-    pub fn state(&self) -> Ref<AppState> {
+    pub fn state(&self) ->  Ref<AppState> {
         self.state.borrow()
     }
 
@@ -65,12 +75,12 @@ impl <TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = E
     }
 
     /// Getting a reference for the remote cache
-    pub fn external_client(&self) -> Arc<E> {
+    pub fn external_client(&self) -> Arc<Box<dyn External>> {
         self.external_client.clone()
     }
-    
+
     /// Getting a reference for the client
-    pub fn client(&self) -> Arc<Mutex<Client<TE,T>>> {
+    pub fn client(&self) -> Arc<Mutex<Box<dyn Client>>> {
         self.client.clone()
     }
 
@@ -84,62 +94,49 @@ impl <TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = E
 
     /// Adding a project as a tab
     pub fn add_project(&self, id: String, title: String, zoom: f64, screens: Vec<Screen>) {
-        self.state_mut().add_project(id, title, zoom, screens);
-        let count = self.state().tab_count();
+        self.state.borrow_mut().add_project(id, title, zoom, screens);
+        let count = self.state.borrow().tab_count();
         self.projects_tree.borrow_mut().push_to_first_leaf(count - 1);
     }
 
-    pub fn projects_tree(&self) -> RefMut<'_, Tree<usize>> {
+    pub fn projects_tree(&self) -> RefMut<Tree<usize>> {
         self.projects_tree.borrow_mut()
     }
 
-    pub fn left_panel_tree(&self) -> RefMut<'_, Tree<LeftPanelTabKind>> {
+    pub fn left_panel_tree(&self) -> RefMut<Tree<LeftPanelTabKind>> {
         self.left_panel_tree.borrow_mut()
     }
 
-    pub fn right_panel_tree(&self) -> RefMut<'_, Tree<RightPanelTabKind>> {
+    pub fn right_panel_tree(&self) -> RefMut<Tree<RightPanelTabKind>> {
         self.right_panel_tree.borrow_mut()
     }
 
     pub fn remove_tab(&self, tab_idx: usize) {
-        let mut projects_tree = self.projects_tree.borrow_mut();
-        let tab_loc = projects_tree.find_tab(&tab_idx).unwrap();
-        projects_tree.remove_tab(tab_loc);
+        let tab_loc = self.projects_tree.borrow().find_tab(&tab_idx).unwrap();
+        self.projects_tree.borrow_mut().remove_tab(tab_loc);
 
-        let mut state_mut = self.state_mut();
-        state_mut.remove_tab(tab_idx);
+        self.state.borrow_mut().remove_tab(tab_idx);
     }
 }
 
-pub struct CreateProjectWindowScope <TE: Debug + Send, T: ClientTransport<TE> > {
-    client: Arc<Mutex<Client<TE, T>>>,
-    state: Rc<RefCell<CreateProjectWindowState>>
+pub struct CreateProjectWindowScope {
+    state: CreateProjectWindowState,
 }
 
-impl <TE: Debug + Send, T: ClientTransport<TE>> CreateProjectWindowScope<TE, T> {
-    pub fn new(client: Arc<Mutex<Client<TE, T>>> ) -> CreateProjectWindowScope<TE, T> {
-        CreateProjectWindowScope { client , state: Rc::new(RefCell::new( CreateProjectWindowState::new())) }
+impl CreateProjectWindowScope {
+    pub fn new() -> CreateProjectWindowScope {
+        CreateProjectWindowScope {
+            state: CreateProjectWindowState::new(),
+        }
     }
 
     /// Getter for a non mutable reference to application wide state
-    pub fn state(&self) -> Ref<CreateProjectWindowState> {
-        self.state.borrow()
+    pub fn state(&self) -> &CreateProjectWindowState {
+        &self.state
     }
 
     /// Getter for a mutable reference to application wide state
-    pub fn state_mut(&self) -> RefMut<CreateProjectWindowState> {
-        self.state.borrow_mut()
-    }
-
-}
-
-pub struct TabScope <TE: Debug + Send, T: ClientTransport<TE>> {
-    client: Arc<Mutex<Client<TE, T>>>,
-    state: Rc<RefCell<TabInfo>>,
-}
-
-impl <TE: Debug + Send, T: ClientTransport<TE>> TabScope<TE, T> {
-    pub fn new(client: Arc<Mutex<Client<TE, T>>>, state: Rc<RefCell<TabInfo>>) -> TabScope<TE, T> {
-        TabScope { client, state }
+    pub fn state_mut(&mut self) -> &mut CreateProjectWindowState {
+        &mut self.state
     }
 }

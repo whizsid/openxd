@@ -15,9 +15,8 @@ pub struct AppState {
     dialog_counter: usize,
     /// Message to display in status bar
     status_message: Option<String>,
-    /// Whether that new project dialog opened or not
-    new_project_opened: bool,
     opened_projects: Vec<Rc<RefCell<TabInfo>>>,
+    create_project_window: CreateProjectWindowState
 }
 
 impl AppState {
@@ -28,8 +27,8 @@ impl AppState {
             dialogs: vec![],
             dialog_counter: 0,
             status_message: None,
-            new_project_opened: false,
-            opened_projects: vec![]
+            opened_projects: vec![],
+            create_project_window: CreateProjectWindowState::new(),
         }
     }
 
@@ -118,21 +117,12 @@ impl AppState {
         self.dialogs.clone()
     }
 
-    /// Opening the new project window
-    pub fn open_new_project_dialog(&mut self) {
-        self.new_project_opened = true;
-        self.main_ui_disabled = true;
+    pub fn create_project_window(&self) -> &CreateProjectWindowState {
+        &self.create_project_window
     }
 
-    /// Closing the new project window
-    pub fn close_new_project_dialog(&mut self) {
-        self.new_project_opened = false;
-        self.main_ui_disabled = false;
-    }
-
-    /// Whether that new project window opened or not
-    pub fn is_new_project_dialog_opened(&self) -> bool {
-        self.new_project_opened
+    pub fn create_project_window_mut(&mut self) -> &mut CreateProjectWindowState {
+        &mut self.create_project_window
     }
 
     /// Adding a project as a tab
@@ -332,12 +322,13 @@ impl Clone for AppDialog {
 
 /// States related to create a project window
 pub struct CreateProjectWindowState {
-    project_name: String
+    project_name: String,
+    opened: bool
 }
 
 impl CreateProjectWindowState {
     pub fn new() -> CreateProjectWindowState {
-        CreateProjectWindowState { project_name: String::new() }
+        CreateProjectWindowState { project_name: String::new(), opened: false }
     }
 
     pub fn change_project_name(&mut self, name: String) {
@@ -346,5 +337,17 @@ impl CreateProjectWindowState {
 
     pub fn get_project_name(&self) -> String {
         self.project_name.clone()
+    }
+
+    pub fn open(&mut self) {
+        self.opened = true;
+    }
+
+    pub fn close(&mut self) {
+        self.opened = false;
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.opened
     }
 }

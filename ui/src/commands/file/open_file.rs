@@ -1,32 +1,17 @@
-use std::{fmt::Debug, rc::Rc};
-
 use poll_promise::Promise;
 use transport::app::TabCreatedMessage;
 
-use crate::{
-    client::ClientTransport, commands::Command, external::External, scopes::ApplicationScope,
-};
+use crate::{commands::Command, scopes::ApplicationScope};
 
-pub struct FileOpenCommand<
-    TE: Debug + Send + 'static,
-    EE: Debug + 'static,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct FileOpenCommand {
+    app_scope: ApplicationScope,
     file_dialog_promise: Option<Promise<Option<(Vec<u8>, String)>>>,
     opened_file_cache_promise: Option<Promise<Result<String, String>>>,
     file_open_promise: Option<Promise<Result<TabCreatedMessage, String>>>,
 }
 
-impl<
-        TE: Debug + Send + 'static,
-        EE: Debug + 'static,
-        T: ClientTransport<TE>,
-        E: External<Error = EE>,
-    > FileOpenCommand<TE, EE, T, E>
-{
-    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>) -> Self {
+impl FileOpenCommand {
+    pub fn new(app_scope: ApplicationScope) -> Self {
         let mut state_mut = app_scope.state_mut();
         state_mut.disable_main_ui();
         state_mut.set_status_message(String::from("Select the file"));
@@ -56,7 +41,6 @@ impl<
         let mut state_mut = self.app_scope.state_mut();
         state_mut.enable_main_ui();
         state_mut.clear_status_message();
-        drop(state_mut);
     }
 
     pub fn cache_opened_file(&mut self, buf: Vec<u8>, file_name: String) {
@@ -70,7 +54,9 @@ impl<
         let _ = self
             .opened_file_cache_promise
             .insert(Promise::spawn_async(async move {
-                let external_res = external_client.create_project_using_existing_file(buf, file_name).await;
+                let external_res = external_client
+                    .create_project_using_existing_file(buf, file_name)
+                    .await;
                 external_res.map_err(|e| format!("{:?}", e))
             }));
     }
@@ -98,15 +84,7 @@ impl<
             .insert(Promise::spawn_async(async move {
                 let mut client_locked = client.lock().await;
                 let res = client_locked.file_open(cache_id).await;
-                match res {
-                    Err(e) => Err(format!("{:?}", e)),
-                    Ok(res) => match res.into() {
-                        Ok(tab_created_message) => {
-                            Ok(tab_created_message)
-                        },
-                        Err(server_err) => Err(format!("Remote: {:?}", server_err)),
-                    },
-                }
+                res.map_err(|e| format!("{:?}", e))
             }));
     }
 
@@ -114,8 +92,12 @@ impl<
         let mut state_mut = self.app_scope.state_mut();
         state_mut.enable_main_ui();
         state_mut.clear_status_message();
-        drop(state_mut);
-        self.app_scope.add_project(tab_created_message.tab_id, tab_created_message.tab_name, tab_created_message.zoom, tab_created_message.screens);
+        self.app_scope.add_project(
+            tab_created_message.tab_id,
+            tab_created_message.tab_name,
+            tab_created_message.zoom,
+            tab_created_message.screens,
+        );
     }
 
     pub fn file_open_failed(&mut self, err: String) {
@@ -132,9 +114,7 @@ impl<
     }
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>> Command
-    for FileOpenCommand<TE, EE, T, E>
-{
+impl Command for FileOpenCommand {
     fn update(&mut self) -> bool {
         let mut done = false;
         if let Some(file_dialog_promise) = self.file_dialog_promise.take() {

@@ -1,5 +1,3 @@
-use std::{fmt::Debug, rc::Rc};
-
 use egui::{Align2, Pos2, TextEdit, Window};
 use egui_extras::Size;
 use egui_grid::GridBuilder;
@@ -7,39 +5,30 @@ use egui_grid::GridBuilder;
 use regex::Regex;
 
 use crate::{
-    client::ClientTransport,
+    commands::file::create_project::CreateProjectCommand,
     components::TopLevelUIComponent,
-    external::External,
-    scopes::{ApplicationScope, CreateProjectWindowScope}, commands::file::create_project::CreateProjectCommand,
+    scopes::{ApplicationScope, CreateProjectWindowScope},
 };
 
-pub struct CreateProjectWindow<
-    TE: Debug + Send,
-    EE: Debug,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    scope: CreateProjectWindowScope<TE, T>,
-    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct CreateProjectWindow {
+    scope: CreateProjectWindowScope,
+    app_scope: ApplicationScope,
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    CreateProjectWindow<TE, EE, T, E>
-{
+impl CreateProjectWindow {
     pub fn new(
-        scope: CreateProjectWindowScope<TE, T>,
-        app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
-    ) -> CreateProjectWindow<TE, EE, T, E> {
+        scope: CreateProjectWindowScope,
+        app_scope: ApplicationScope,
+    ) -> CreateProjectWindow {
         Self { scope, app_scope }
     }
 }
 
-impl<TE: Debug + Send + 'static, EE: Debug + 'static, T: ClientTransport<TE>, E: External<Error = EE>>
-    TopLevelUIComponent for CreateProjectWindow<TE, EE, T, E>
-{
+impl TopLevelUIComponent for CreateProjectWindow {
     fn draw(&mut self, ctx: &egui::Context) {
-        let create_project_dialog_opened = self.app_scope.state().is_new_project_dialog_opened();
+        let create_project_dialog_opened = self.app_scope.state().create_project_window().is_open();
         let mut create_project_dialog_open = create_project_dialog_opened;
+
         let screen = ctx.screen_rect();
 
         Window::new("Create A Project")
@@ -77,16 +66,23 @@ impl<TE: Debug + Send + 'static, EE: Debug + 'static, T: ClientTransport<TE>, E:
                         grid.cell(|ui| {
                             ui.set_enabled(valid_name);
                             if ui.button("Create").clicked() {
-                                self.app_scope.execute(CreateProjectCommand::new(self.app_scope.clone(), self.scope.state().get_project_name()));
-                                self.scope.state_mut().change_project_name(String::new());
-                                self.app_scope.state_mut().close_new_project_dialog();
+                                let project_name = self.scope.state().get_project_name();
+                                let create_project_command = CreateProjectCommand::new(self.app_scope.clone(), project_name.clone() );
+                                self.app_scope.execute(create_project_command);
+                                let mut state_mut = self.app_scope.state_mut();
+                                let create_project_state = state_mut.create_project_window_mut();
+                                create_project_state.change_project_name(String::new());
+                                create_project_state.close();
                             }
                         })
                     });
             });
 
         if create_project_dialog_opened && !create_project_dialog_open {
-            self.app_scope.state_mut().close_new_project_dialog();
+            self.app_scope
+                .state_mut()
+                .create_project_window_mut()
+                .close();
         }
     }
 }

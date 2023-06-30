@@ -1,30 +1,28 @@
-use std::{fmt::Debug, rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use egui::Frame;
 
 use crate::{
-    client::ClientTransport, commands::{tab::close_tab::TabCloseCommand, nope::NopeCommand}, external::External,
-    scopes::ApplicationScope, state::Severity,
+    commands::{nope::NopeCommand, tab::close_tab::TabCloseCommand},
+    scopes::ApplicationScope,
+    state::Severity,
 };
 
 use super::{canvas::CanvasComponent, UIComponent};
 
-pub struct ProjectsTabViewer<
-    TE: Debug + Send + 'static,
-    EE: Debug + 'static,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct ProjectsTabViewer {
+    app_scope: ApplicationScope,
     canvas_component: CanvasComponent,
     last_tab: usize,
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    ProjectsTabViewer<TE, EE, T, E>
-{
-    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>, gl: Arc<glow::Context>) -> ProjectsTabViewer<TE, EE, T, E> {
-        ProjectsTabViewer { app_scope, canvas_component: CanvasComponent::new(gl), last_tab: 0 }
+impl ProjectsTabViewer {
+    pub fn new(app_scope: ApplicationScope, gl: Arc<glow::Context>) -> ProjectsTabViewer {
+        ProjectsTabViewer {
+            app_scope,
+            canvas_component: CanvasComponent::new(gl),
+            last_tab: 0,
+        }
     }
 
     pub fn exit(&mut self, gl: Option<&glow::Context>) {
@@ -32,9 +30,7 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
     }
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    egui_dock::TabViewer for ProjectsTabViewer<TE, EE, T, E>
-{
+impl egui_dock::TabViewer for ProjectsTabViewer {
     type Tab = usize;
 
     fn ui(&mut self, ui: &mut egui::Ui, tab_idx: &mut Self::Tab) {
@@ -83,12 +79,9 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
             let cloned_app_scope = self.app_scope.clone();
             let cloned_tab_idx = tab_idx.clone();
             drop(borrowed_tab);
-            dialog.add_button(Severity::Error, "Yes").on_click(move || {
-                Box::new(TabCloseCommand::new(
-                    cloned_app_scope,
-                    cloned_tab_idx,
-                ))
-            });
+            dialog
+                .add_button(Severity::Error, "Yes")
+                .on_click(move || Box::new(TabCloseCommand::new(cloned_app_scope, cloned_tab_idx)));
             let app_scope = self.app_scope.clone();
             let cloned_tab_idx = tab_idx.clone();
             dialog.on_close(move || {
@@ -115,29 +108,22 @@ pub enum LeftPanelTabKind {
     Components,
 }
 
-pub struct LeftPanelTabViewer<
-    TE: Debug + Send,
-    EE: Debug,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct LeftPanelTabViewer {
+    _app_scope: ApplicationScope,
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    LeftPanelTabViewer<TE, EE, T, E>
-{
-    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>) -> LeftPanelTabViewer<TE, EE, T, E> {
-        LeftPanelTabViewer { app_scope }
+impl LeftPanelTabViewer {
+    pub fn new(app_scope: ApplicationScope) -> LeftPanelTabViewer {
+        LeftPanelTabViewer {
+            _app_scope: app_scope,
+        }
     }
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    egui_dock::TabViewer for LeftPanelTabViewer<TE, EE, T, E>
-{
+impl egui_dock::TabViewer for LeftPanelTabViewer {
     type Tab = LeftPanelTabKind;
 
-    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {}
+    fn ui(&mut self, _ui: &mut egui::Ui, _tab: &mut Self::Tab) {}
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
         match tab {
@@ -154,29 +140,22 @@ pub enum RightPanelTabKind {
     Properties,
 }
 
-pub struct RightPanelTabViewer<
-    TE: Debug + Send,
-    EE: Debug,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct RightPanelTabViewer {
+    _app_scope: ApplicationScope,
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    RightPanelTabViewer<TE, EE, T, E>
-{
-    pub fn new(app_scope: Rc<ApplicationScope<TE, EE, T, E>>) -> RightPanelTabViewer<TE, EE, T, E> {
-        RightPanelTabViewer { app_scope }
+impl RightPanelTabViewer {
+    pub fn new(app_scope: ApplicationScope) -> RightPanelTabViewer {
+        RightPanelTabViewer {
+            _app_scope: app_scope,
+        }
     }
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    egui_dock::TabViewer for RightPanelTabViewer<TE, EE, T, E>
-{
+impl egui_dock::TabViewer for RightPanelTabViewer {
     type Tab = RightPanelTabKind;
 
-    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {}
+    fn ui(&mut self, _ui: &mut egui::Ui, _tab: &mut Self::Tab) {}
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
         match tab {

@@ -1,8 +1,6 @@
-use std::{fmt::Debug, rc::Rc};
-
 use egui::{pos2, Align, Area, Frame, Layout, Margin};
 
-use crate::{client::ClientTransport, external::External, scopes::ApplicationScope};
+use crate::scopes::ApplicationScope;
 
 use super::TopLevelUIComponent;
 
@@ -10,26 +8,20 @@ const DIALOG_WIDTH: f32 = 160.00;
 const DIALOG_MARGIN_X: f32 = 8.0;
 const DIALOG_MARGIN_Y: f32 = 8.0;
 
-pub struct DialogContainerComponent<
-    TE: Debug + Send,
-    EE: Debug,
-    T: ClientTransport<TE>,
-    E: External<Error = EE>,
-> {
-    app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
+pub struct DialogContainerComponent {
+    app_scope: ApplicationScope,
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    DialogContainerComponent<TE, EE, T, E>
-{
-    pub fn new(
-        app_scope: Rc<ApplicationScope<TE, EE, T, E>>,
-    ) -> DialogContainerComponent<TE, EE, T, E> {
+impl DialogContainerComponent {
+    pub fn new(app_scope: ApplicationScope) -> DialogContainerComponent {
         DialogContainerComponent { app_scope }
     }
 
     pub fn close_button_clicked(&self, dialog_id: usize) {
-        let dialog_opt = self.app_scope.state_mut().remove_dialog(dialog_id);
+        let dialog_opt = self
+            .app_scope
+            .state_mut()
+            .remove_dialog(dialog_id);
         if let Some(dialog) = dialog_opt {
             let close_cmd_opt = dialog.create_close_command();
 
@@ -55,7 +47,11 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
         };
         drop(state);
 
-        let mut dialog = self.app_scope.state_mut().remove_dialog(dialog_id).unwrap();
+        let mut dialog = self
+            .app_scope
+            .state_mut()
+            .remove_dialog(dialog_id)
+            .unwrap();
         let btn = dialog.pop_button(btn_id).unwrap();
         let cmd_opt = btn.create_command();
 
@@ -65,9 +61,7 @@ impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE
     }
 }
 
-impl<TE: Debug + Send, EE: Debug, T: ClientTransport<TE>, E: External<Error = EE>>
-    TopLevelUIComponent for DialogContainerComponent<TE, EE, T, E>
-{
+impl TopLevelUIComponent for DialogContainerComponent {
     fn draw(&mut self, ctx: &egui::Context) {
         let win_max = ctx.screen_rect().max;
         Area::new("dialogs")
