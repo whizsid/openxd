@@ -86,7 +86,7 @@ async fn main() {
     });
     let options = NativeOptions {
         multisampling: 4,
-        renderer: eframe::Renderer::Glow,
+        renderer: eframe::Renderer::Wgpu,
         ..Default::default()
     };
     run_native(

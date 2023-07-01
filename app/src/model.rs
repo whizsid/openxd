@@ -268,3 +268,12 @@ pub fn thing<T: Into<String>, I: Into<Id>>(table: T, id: I) -> Thing {
         id: id.into(),
     }
 }
+
+pub struct Plugin {
+    pub id: Option<Thing>,
+    pub slug: String,
+    pub owner: Thing,
+    pub name: String,
+    pub created_at: Datetime,
+}
+

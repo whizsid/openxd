@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use egui::Frame;
 
 use crate::{
@@ -8,25 +6,22 @@ use crate::{
     state::Severity,
 };
 
-use super::{canvas::CanvasComponent, UIComponent};
+use super::{workbook_canvas::WorkbookCanvasComponent, UIComponent};
+use egui_wgpu::RenderState;
 
 pub struct ProjectsTabViewer {
     app_scope: ApplicationScope,
-    canvas_component: CanvasComponent,
+    canvas_component: WorkbookCanvasComponent,
     last_tab: usize,
 }
 
 impl ProjectsTabViewer {
-    pub fn new(app_scope: ApplicationScope, gl: Arc<glow::Context>) -> ProjectsTabViewer {
+    pub fn new(app_scope: ApplicationScope, gb: &RenderState) -> ProjectsTabViewer {
         ProjectsTabViewer {
             app_scope,
-            canvas_component: CanvasComponent::new(gl),
+            canvas_component: WorkbookCanvasComponent::new(gb),
             last_tab: 0,
         }
-    }
-
-    pub fn exit(&mut self, gl: Option<&glow::Context>) {
-        self.canvas_component.exit(gl);
     }
 }
 

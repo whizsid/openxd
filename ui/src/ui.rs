@@ -21,6 +21,7 @@ use crate::components::windows::create_project_window::CreateProjectWindow;
 use crate::components::{TopLevelUIComponent, UIComponent};
 use crate::external::External;
 use crate::scopes::{ApplicationScope, CreateProjectWindowScope};
+use egui_wgpu::RenderState;
 
 pub struct Ui {
     scope: ApplicationScope,
@@ -39,7 +40,7 @@ impl Ui {
     /// Creating the main UI by passing external interfaces
     pub fn new(
         ctx: &Context,
-        gl: Arc<glow::Context>,
+        gb: &RenderState,
         client: Box<dyn Client + 'static>,
         external_client: Box<dyn External + 'static>,
     ) -> Self {
@@ -69,16 +70,12 @@ impl Ui {
                 CreateProjectWindowScope::new(),
                 app_scope.clone(),
             ),
-            tab_viewer: ProjectsTabViewer::new(app_scope.clone(), gl),
+            tab_viewer: ProjectsTabViewer::new(app_scope.clone(), gb),
             left_panel_tab_viewer: LeftPanelTabViewer::new(app_scope.clone()),
             right_panel_tab_viewer: RightPanelTabViewer::new(app_scope.clone()),
             quick_icons_component,
             scope: app_scope,
         }
-    }
-
-    pub fn exit(&mut self, gl: Option<&glow::Context>) {
-        self.tab_viewer.exit(gl);
     }
 
     /// Updating the components and command statuses in a one iteration in event loop.

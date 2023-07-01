@@ -23,9 +23,9 @@ impl StandaloneApp {
     ) -> StandaloneApp {
         let client = ClientImpl::new(internal);
         let external = MockApi::new(db, storage);
-        let gl = cc.gl.clone().unwrap();
+        let wgpu_render_state = cc.wgpu_render_state.as_ref().unwrap();
         StandaloneApp {
-            ui: Ui::new(&cc.egui_ctx, gl, Box::new(client), Box::new(external)),
+            ui: Ui::new(&cc.egui_ctx, wgpu_render_state, Box::new(client), Box::new(external)),
         }
     }
 }
@@ -33,9 +33,5 @@ impl StandaloneApp {
 impl App for StandaloneApp {
     fn update(&mut self, ctx: &eframe::egui::Context, frame: &mut eframe::Frame) {
         self.ui.update(ctx);
-    }
-
-    fn on_exit(&mut self, gl: Option<&eframe::glow::Context>) {
-        self.ui.exit(gl);
     }
 }

@@ -65,3 +65,19 @@ impl<A: StorageId, B: StorageId> ReplaceAsset<B> for Screen<A> {
         }
     }
 }
+
+
+pub struct ScreenSize {
+    model: String,
+    device_name: String,
+    /// Width in mm
+    width: f32,
+    /// Height in mm
+    height: f32,
+    /// Resolution wxh
+    resolution: (u32, u32),
+    /// The shape of the outside of screen
+    outer_path: String,
+    /// The shape of the inside of screen
+    inner_path: String,
+}
