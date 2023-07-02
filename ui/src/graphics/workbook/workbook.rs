@@ -1,24 +1,13 @@
 use egui_wgpu::RenderState;
-use wgpu::{ShaderModuleDescriptor, BindGroupLayoutDescriptor, util::{DeviceExt, BufferInitDescriptor}, Device, Queue, RenderPass, BufferUsages};
-
-pub struct TriangleRenderResources {
-    
-}
-
-impl TriangleRenderResources {
-    fn prepare(&self, _device: &wgpu::Device, queue: &wgpu::Queue, angle: f32) {
-        
-    }
-
-    fn paint<'rpass>(&'rpass self, rpass: &mut wgpu::RenderPass<'rpass>) {
-       
-    }
-}
+use lyon_tessellation::{StrokeTessellator, FillTessellator};
+use wgpu::{ShaderModuleDescriptor, BindGroupLayoutDescriptor, util::{DeviceExt, BufferInitDescriptor}, Device, Queue, RenderPass, BufferUsages, ShaderSource};
 
 pub struct Workbook {
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
     uniform_buffer: wgpu::Buffer,
+    stroke_tessellator: StrokeTessellator,
+    fill_tessellator: FillTessellator,
 }
 
 impl Workbook {
@@ -27,6 +16,11 @@ impl Workbook {
         // from `eframe::Frame` when you don't have a `CreationContext` available.
 
         let device = &render_state.device;
+
+        let straight_line_shader = device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("straight_line_shader"),
+            source: ShaderSource::Wgsl(include_str!("straight_line.wgsl").into()),
+        });
 
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
@@ -100,6 +94,8 @@ impl Workbook {
                 pipeline,
                 bind_group,
                 uniform_buffer,
+                fill_tessellator: FillTessellator::new(),
+                stroke_tessellator: StrokeTessellator::new()
             });
     }
 
