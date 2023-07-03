@@ -35,7 +35,7 @@ impl Line {
     /// The line path without the area of edges
     ///
     /// Example:-
-    /// ```
+    /// ```ignore
     /// [ ]---------------------[ ]
     ///  ^ ^                   ^ ^
     ///  1 2                   3 4
@@ -46,15 +46,16 @@ impl Line {
     /// 3 = End of the last edge area
     /// 4 = End point
     pub fn path_without_edges(&self, screen_min: Point) -> Path {
-        
+        unimplemented!()
     }
 
     /// The area of the starting edge
     pub fn start_edge_path(&self, screen_min: Point) -> Path {
+        unimplemented!()
     }
 
     /// The area of the last edge
     pub fn end_edge_path(&self, screen_min: Point) -> Path {
-
+        unimplemented!()
     }
 }

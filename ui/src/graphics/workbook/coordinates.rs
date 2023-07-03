@@ -40,26 +40,114 @@ pub type GraphicPoint = Point2D<f32, GraphicScope>;
 /// - `zoom` :- Zoom value set by the UI
 /// - `canvas_width` :- Width of the wgpu canvas in pixel
 /// - `canvas_height` :- Height of the wgpu canvas in pixel
-pub fn graphic_to_canvas(ppcm: f32, zoom: f32, canvas_width: u32, canvas_height: u32 ) -> Transform2D<f32, GraphicScope, CanvasScope> {
-    unimplemented!()
+/// - `offset_x` :- X axis offset in nano meters after scrolled
+/// - `offset_y` :- Y axis offset in nano meters after scrolled
+pub fn graphic_to_canvas(
+    ppcm: f32,
+    zoom: f32,
+    canvas_width: u32,
+    canvas_height: u32,
+    offset_x: f32,
+    offset_y: f32,
+) -> Transform2D<f32, GraphicScope, CanvasScope> {
+    // Equation:-
+    //
+    // ```ignore
+    // x` = [(canvas_width x 10 x 1000 x zoom)/ppcm]x + offset_x
+    //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^    ^^^^^^^^
+    //                       a                             b
+    //
+    // y` = [(canvas_height x 10 x 1000 x zoom)/ppcm]y + offset_y
+    //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^    ^^^^^^^^
+    //                       c                              d
+    // ```ignore
+    //
+    // Matrix representation (row-major):-
+    //
+    // ```ignore
+    // | x' |   | a 0 b |   | x |
+    // | y' | = | 0 c d | x | y |
+    // | w  |   | 0 0 1 |   | 1 |
+    // ```
+    //
+    // Column Major:-
+    //
+    // ```ignore
+    // | a 0 0 |    | m11 m12 0 |
+    // | 0 c 0 | => | m21 m22 0 |
+    // | b d 1 |    | m31 m32 1 |
+    // ```
+
+    Transform2D::new(
+        ((canvas_width as f32) * 10000.0 * zoom) / ppcm,
+        0.0,
+        0.0,
+        ((canvas_height as f32) * 10000.0 * zoom) / ppcm,
+        offset_x,
+        offset_y,
+    )
 }
 
 /// Getting the transformation matrix to convert from canvas scope to screen scope
 ///
-/// - `screen_min` :- Coordinate of left-top corner of the screen. The coordinate should be in
-/// canvas scope
 /// - `ppcm` :- pixels per a centimeter in canvas scope.
-pub fn canvas_to_screen(screen_min: CanvasPoint, ppcm: f32) -> Transform2D<f32, CanvasScope, ScreenScope> {
-    unimplemented!()
+/// - `offset_x` :- x coordinate of the left top corner of the screen
+/// - `offset_y` :- y coordinate of the left top corner of the screen
+pub fn canvas_to_screen(
+    ppcm: f32,
+    offset_x: f32,
+    offset_y: f32,
+) -> Transform2D<f32, CanvasScope, ScreenScope> {
+    // Equation
+    //
+    // ```ignore
+    // x' = (ppcm/10000) x x - (offset_x*ppcm)/10000
+    //      ^^^^^^^^^^^^       ^^^^^^^^^^^^^^^^^^^^^
+    //           a                        b
+    // y' = (ppcm/10000) x y - (offset_y*ppcm)/10000
+    //      ^^^^^^^^^^^^       ^^^^^^^^^^^^^^^^^^^^^
+    //           c                        d
+    // ```
+    //
+    // Matrix representation (row-major):-
+    //
+    // ```ignore
+    // | x' |   | a 0 b |   | x |
+    // | y' | = | 0 c d | x | y |
+    // | w  |   | 0 0 1 |   | 1 |
+    // ```
+    //
+    // Column Major:-
+    //
+    // ```ignore
+    // | a 0 0 |    | m11 m12 0 |
+    // | 0 c 0 | => | m21 m22 0 |
+    // | b d 1 |    | m31 m32 1 |
+    // ```
+
+    Transform2D::new(
+        ppcm / 10000.0,
+        0.0,
+        0.0,
+        ppcm / 10000.0,
+        -(offset_x * ppcm) / 10000.0,
+        -(offset_y * ppcm) / 10000.0,
+    )
 }
 
 /// Getting the transformation matrix to convert from screen scope to canvas scope
 ///
-/// - `screen_min` :- Coordinate of left-top corner of the screen. The coordinate should be in
-/// canvas scope
 /// - `ppcm` :- pixels per a centimeter in canvas scope.
-pub fn screen_to_canvas(screen_min: CanvasPoint, ppcm: f32) -> Transform2D<f32, ScreenScope, CanvasScope> {
-    canvas_to_screen(screen_min, ppcm).inverse().unwrap()
+/// - `offset_x` :- x coordinate of the left top corner of the screen
+/// - `offset_y` :- y coordinate of the left top corner of the screen
+pub fn screen_to_canvas(
+    ppcm: f32,
+    offset_x: f32,
+    offset_y: f32,
+) -> Transform2D<f32, ScreenScope, CanvasScope> {
+    canvas_to_screen(ppcm, offset_x, offset_y)
+        .inverse()
+        .unwrap()
 }
 
 /// Getting the transformation matrix to convert from canvas scope to graphics scope
@@ -69,6 +157,118 @@ pub fn screen_to_canvas(screen_min: CanvasPoint, ppcm: f32) -> Transform2D<f32, 
 /// - `zoom` :- Zoom value set by the UI
 /// - `canvas_width` :- Width of the wgpu canvas in pixel
 /// - `canvas_height` :- Height of the wgpu canvas in pixel
-pub fn canvas_to_graphic(ppcm: f32, zoom: f32, canvas_width: u32, canvas_height: u32) -> Transform2D<f32, CanvasScope, GraphicScope> {
-    graphic_to_canvas(ppcm, zoom, canvas_width, canvas_height).inverse().unwrap()
+/// - `offset_x` :- X axis offset in nano meters after scrolled
+/// - `offset_y` :- Y axis offset in nano meters after scrolled
+pub fn canvas_to_graphic(
+    ppcm: f32,
+    zoom: f32,
+    canvas_width: u32,
+    canvas_height: u32,
+    offset_x: f32,
+    offset_y: f32,
+) -> Transform2D<f32, CanvasScope, GraphicScope> {
+    graphic_to_canvas(ppcm, zoom, canvas_width, canvas_height, offset_x, offset_y)
+        .inverse()
+        .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::graphic_to_canvas;
+    use super::*;
+
+    #[test]
+    pub fn test_graphic_to_canvas_without_offset_and_zoom() {
+        let transformed: CanvasPoint = graphic_to_canvas(50.0, 1.0, 1269, 714, 0.0, 0.0)
+            .transform_point(GraphicPoint::new(0.1, 0.4));
+        assert_eq!(transformed, CanvasPoint::new(25380.0, 57120.0));
+    }
+
+    #[test]
+    pub fn test_graphic_to_canvas_without_offset() {
+        let transformed: CanvasPoint = graphic_to_canvas(50.0, 0.1, 1269, 714, 0.0, 0.0)
+            .transform_point(GraphicPoint::new(0.1, 0.4));
+        assert_eq!(transformed, CanvasPoint::new(2538.0, 5712.0));
+    }
+
+    #[test]
+    pub fn test_graphic_to_canvas_without_zoom() {
+        let transformed: CanvasPoint = graphic_to_canvas(50.0, 1.0, 1269, 714, 200.0, 300.0)
+            .transform_point(GraphicPoint::new(0.1, 0.4));
+        assert_eq!(transformed, CanvasPoint::new(25580.0, 57420.0));
+    }
+
+    #[test]
+    pub fn test_graphic_to_canvas() {
+        let transformed: CanvasPoint = graphic_to_canvas(50.0, 0.1, 1269, 714, 200.0, 300.0)
+            .transform_point(GraphicPoint::new(0.1, 0.4));
+        assert_eq!(transformed, CanvasPoint::new(2738.0, 6012.0));
+    }
+
+    #[test]
+    pub fn test_canvas_to_graphic_without_offset_and_zoom() {
+        let transformed: GraphicPoint = canvas_to_graphic(50.0, 1.0, 1269, 714, 0.0, 0.0)
+            .transform_point(CanvasPoint::new(25380.0, 57120.0));
+        assert_eq!(transformed, GraphicPoint::new(0.099999994, 0.4));
+    }
+
+    #[test]
+    pub fn test_canvas_to_graphic_without_offset() {
+        let transformed: GraphicPoint = canvas_to_graphic(50.0, 0.1, 1269, 714, 0.0, 0.0)
+            .transform_point(CanvasPoint::new(2538.0, 5712.0));
+        assert_eq!(transformed, GraphicPoint::new(0.1, 0.4));
+    }
+
+    #[test]
+    pub fn test_canvas_to_graphic_without_zoom() {
+        let transformed: GraphicPoint = canvas_to_graphic(50.0, 1.0, 1269, 714, 200.0, 300.0)
+            .transform_point(CanvasPoint::new(25580.0, 57420.0));
+        assert_eq!(transformed, GraphicPoint::new(0.099999994, 0.4));
+    }
+
+    #[test]
+    pub fn test_canvas_to_graphic() {
+        let transformed: GraphicPoint = canvas_to_graphic(50.0, 0.1, 1269, 714, 200.0, 300.0)
+            .transform_point(CanvasPoint::new(2738.0, 6012.0));
+        assert_eq!(transformed, GraphicPoint::new(0.1, 0.4));
+    }
+
+    #[test]
+    pub fn test_canvas_to_screen_without_offset() {
+        let transformed: Point2D<f32, ScreenScope> = canvas_to_screen(163.63636363636363, 0.0, 0.0)
+            .transform_point(CanvasPoint::new(20000.0, 30000.0));
+
+        assert_eq!(
+            ScreenPoint::new(transformed.x as u32, transformed.y as u32),
+            ScreenPoint::new(327, 490)
+        );
+    }
+
+    #[test]
+    pub fn test_canvas_to_screen() {
+        let transformed: Point2D<f32, ScreenScope> =
+            canvas_to_screen(163.63636363636363, 15000.0, 15000.0)
+                .transform_point(CanvasPoint::new(20000.0, 30000.0));
+
+        assert_eq!(
+            ScreenPoint::new(transformed.x as u32, transformed.y as u32),
+            ScreenPoint::new(81, 245)
+        );
+    }
+
+    #[test]
+    pub fn test_screen_to_canvas_without_offset() {
+        let transformed: CanvasPoint = screen_to_canvas(163.63636363636363, 0.0, 0.0)
+            .transform_point(Point2D::new(327.0, 490.0));
+
+        assert_eq!(transformed, CanvasPoint::new(19983.332, 29944.441));
+    }
+
+    #[test]
+    pub fn test_screen_to_canvas() {
+        let transformed: CanvasPoint = screen_to_canvas(163.63636363636363, 15000.0, 15000.0)
+            .transform_point(Point2D::new(81.0, 245.0));
+
+        assert_eq!(transformed, CanvasPoint::new(19949.998, 29972.219));
+    }
 }
