@@ -27,7 +27,12 @@ pub struct CanvasScope;
 /// Scope that graphics API using for the canvas
 pub struct GraphicScope;
 
-pub type ScreenPoint = Point2D<u32, ScreenScope>;
+/// A 2d Point in the screen
+///
+/// This point will take i32 as pixel coordinates. Because users can specify coordinates
+/// in outside of the screen. But only in-screen things are rendered. They can use those
+/// minus values to animate purposes.
+pub type ScreenPoint = Point2D<i32, ScreenScope>;
 
 pub type CanvasPoint = Point2D<f32, CanvasScope>;
 
@@ -53,13 +58,13 @@ pub fn graphic_to_canvas(
     // Equation:-
     //
     // ```ignore
-    // x` = [(canvas_width x 10 x 1000 x zoom)/ppcm]x + offset_x
-    //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^    ^^^^^^^^
-    //                       a                             b
+    // x` = [(canvas_width x 10 x 1000 x zoom)/(ppcm x 2)]x + offset_x + (canvas_width x 10 x 1000 x zoom)/(ppcm x 2)
+    //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    //                       a                                                         b
     //
-    // y` = [(canvas_height x 10 x 1000 x zoom)/ppcm]y + offset_y
-    //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^    ^^^^^^^^
-    //                       c                              d
+    // y` = [(canvas_height x 10 x 1000 x zoom)/(ppcm x 2)]y + offset_y + (canvas_height x 10 x 1000 x zoom)/(ppcm x 2)
+    //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    //                       c                                                          d
     // ```ignore
     //
     // Matrix representation (row-major):-
@@ -79,12 +84,12 @@ pub fn graphic_to_canvas(
     // ```
 
     Transform2D::new(
-        ((canvas_width as f32) * 10000.0 * zoom) / ppcm,
+        ((canvas_width as f32) * 10000.0 * zoom) / (ppcm * 2.0),
         0.0,
         0.0,
-        ((canvas_height as f32) * 10000.0 * zoom) / ppcm,
-        offset_x,
-        offset_y,
+        -((canvas_height as f32) * 10000.0 * zoom) / (ppcm * 2.0),
+        offset_x + ((canvas_width as f32) * 10000.0 * zoom) / (ppcm * 2.0),
+        offset_y + ((canvas_height as f32) * 10000.0 * zoom) / (ppcm * 2.0),
     )
 }
 
@@ -239,7 +244,7 @@ mod tests {
             .transform_point(CanvasPoint::new(20000.0, 30000.0));
 
         assert_eq!(
-            ScreenPoint::new(transformed.x as u32, transformed.y as u32),
+            ScreenPoint::new(transformed.x as i32, transformed.y as i32),
             ScreenPoint::new(327, 490)
         );
     }
@@ -251,7 +256,7 @@ mod tests {
                 .transform_point(CanvasPoint::new(20000.0, 30000.0));
 
         assert_eq!(
-            ScreenPoint::new(transformed.x as u32, transformed.y as u32),
+            ScreenPoint::new(transformed.x as i32, transformed.y as i32),
             ScreenPoint::new(81, 245)
         );
     }

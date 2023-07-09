@@ -12,7 +12,7 @@ use egui_wgpu::RenderState;
 pub struct ProjectsTabViewer {
     app_scope: ApplicationScope,
     canvas_component: WorkbookCanvasComponent,
-    last_tab: usize,
+    last_tab: Option<usize>,
 }
 
 impl ProjectsTabViewer {
@@ -20,7 +20,7 @@ impl ProjectsTabViewer {
         ProjectsTabViewer {
             app_scope,
             canvas_component: WorkbookCanvasComponent::new(gb),
-            last_tab: 0,
+            last_tab: None,
         }
     }
 }
@@ -30,8 +30,16 @@ impl egui_dock::TabViewer for ProjectsTabViewer {
 
     fn ui(&mut self, ui: &mut egui::Ui, tab_idx: &mut Self::Tab) {
         let tab = self.app_scope.state().tab(*tab_idx);
-        if self.last_tab != *tab_idx {
+        if let Some(last_tab) = self.last_tab {
+            if last_tab != *tab_idx {
+                if let Some(_tab) = tab {
+                    self.last_tab = Some(tab_idx.clone());
+                    self.canvas_component.change_tab(*tab_idx);
+                }
+            }
+        } else {
             if let Some(_tab) = tab {
+                self.last_tab = Some(tab_idx.clone());
                 self.canvas_component.change_tab(*tab_idx);
             }
         }

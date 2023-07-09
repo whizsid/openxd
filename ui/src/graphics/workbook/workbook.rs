@@ -1,113 +1,158 @@
+use std::marker::PhantomData;
+
 use egui_wgpu::RenderState;
-use lyon_tessellation::{StrokeTessellator, FillTessellator};
-use wgpu::{ShaderModuleDescriptor, BindGroupLayoutDescriptor, util::{DeviceExt, BufferInitDescriptor}, Device, Queue, RenderPass, BufferUsages, ShaderSource};
+use euclid::Transform2D;
+use lyon_tessellation::{FillTessellator, StrokeTessellator};
+use wgpu::{Device, Queue, RenderPass};
+
+use super::{
+    coordinates::{canvas_to_graphic, screen_to_canvas, CanvasScope, GraphicScope, CanvasPoint},
+    line::{Line, LineRenderPipeline},
+    screen::{IndexedScreenItems, IndexedScreenWithChild, Screen, ScreenItems, ScreenWithChild},
+    IndexedItem, Item,
+};
 
 pub struct Workbook {
-    pipeline: wgpu::RenderPipeline,
-    bind_group: wgpu::BindGroup,
-    uniform_buffer: wgpu::Buffer,
+    /// Stroke tessellator to use in advanced graphics
     stroke_tessellator: StrokeTessellator,
+    /// Fill tessellator to use in advanced graphics
     fill_tessellator: FillTessellator,
+    /// Zoom level
+    zoom: f32,
+    /// Scrolled offset
+    offset_x: f32,
+    /// Scrolled offset
+    offset_y: f32,
+    /// Pixels per centimeter value of the user's monitor
+    ppcm: f32,
+
+    canvas_width: u32,
+    canvas_height: u32,
+
+    /// Canvas to graphic transformer
+    transform_out: Transform2D<f32, CanvasScope, GraphicScope>,
+    /// To render lines
+    line_render_pipeline: LineRenderPipeline,
+    screens: Vec<IndexedScreenWithChild>,
 }
 
 impl Workbook {
-    pub fn init(render_state: &RenderState) {
-        // Get the WGPU render state from the eframe creation context. This can also be retrieved
-        // from `eframe::Frame` when you don't have a `CreationContext` available.
+    pub fn new(render_state: &RenderState, ppcm: f32) -> Workbook {
+        let line_render_pipeline = LineRenderPipeline::new(&render_state, vec![]);
 
-        let device = &render_state.device;
 
-        let straight_line_shader = device.create_shader_module(ShaderModuleDescriptor {
-            label: Some("straight_line_shader"),
-            source: ShaderSource::Wgsl(include_str!("straight_line.wgsl").into()),
-        });
-
-        let shader = device.create_shader_module(ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(include_str!("./workbook.wgsl").into()),
-        });
-
-        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[],
+        Workbook {
+            line_render_pipeline,
+            fill_tessellator: FillTessellator::new(),
+            stroke_tessellator: StrokeTessellator::new(),
+            transform_out: Transform2D {
+                m11: 0.0,
+                m12: 0.0,
+                m21: 0.0,
+                m22: 0.0,
+                m31: 0.0,
+                m32: 0.0,
+                _unit: PhantomData,
             },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(render_state.target_format.into())],
-            }),
-            primitive: wgpu::PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-        });
-
-        let uniform_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&[0.0]),
-            usage: BufferUsages::COPY_DST
-                | BufferUsages::MAP_WRITE
-                | BufferUsages::UNIFORM,
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
-        });
-
-        // Because the graphics pipeline must have the same lifetime as the egui render pass,
-        // instead of storing the pipeline in our `Custom3D` struct, we insert it into the
-        // `paint_callback_resources` type map, which is stored alongside the render pass.
-        render_state
-            .renderer
-            .write()
-            .paint_callback_resources
-            .insert(Workbook{
-                pipeline,
-                bind_group,
-                uniform_buffer,
-                fill_tessellator: FillTessellator::new(),
-                stroke_tessellator: StrokeTessellator::new()
-            });
+            canvas_width: 0,
+            canvas_height: 0,
+            zoom: 1.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+            ppcm,
+            screens: vec![],
+        }
     }
 
-    pub fn prepare(&self, device: &Device, queue: &Queue) {
-        // Update our uniform buffer with the angle from the UI
-        queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[0.0]));
+    pub fn reset(&mut self, screens: Vec<ScreenWithChild>) {
+        self.line_render_pipeline.reset();
+
+        let mut indexed_screens = vec![];
+
+        for screen in screens {
+            let min = screen.meta.tl();
+            let ppcm = screen.meta.get_ppcm();
+            let sc_transform = screen_to_canvas(ppcm, min.x, min.y);
+            let sg_transform = sc_transform.then(&self.transform_out);
+            match screen.items {
+                ScreenItems::Items(items) => {
+                    let mut indexed_items = Vec::new();
+                    for item in items {
+                        match item {
+                            Item::Line(line) => {
+                                let line_index = self
+                                    .line_render_pipeline
+                                    .add(line.to_line_raw(sg_transform));
+                                indexed_items.push(IndexedItem::Line { line, line_index });
+                            }
+                        }
+                    }
+                    let indexed_screen = IndexedScreenWithChild {
+                        meta: screen.meta,
+                        items: IndexedScreenItems::Items(indexed_items),
+                    };
+                    indexed_screens.push(indexed_screen);
+                }
+                ScreenItems::Proxy => {
+                    indexed_screens.push(IndexedScreenWithChild {
+                        meta: screen.meta,
+                        items: IndexedScreenItems::Proxy,
+                    });
+                }
+            }
+        }
+
+        self.screens = indexed_screens;
+    }
+
+    pub fn add_line(&mut self, screen: Screen, line: Line) {
+        let min = screen.tl();
+        let sc_transform = screen_to_canvas(screen.get_ppcm(), min.x, min.y);
+        let sg_transform = sc_transform.then(&self.transform_out);
+        let line_raw = line.to_line_raw(sg_transform);
+        self.line_render_pipeline.add(line_raw);
+    }
+
+    pub fn zoom(&mut self, zoom: f32) {
+        self.zoom = zoom;
+        self.update_transform_out();
+    }
+
+    pub fn scroll(&mut self, offset_x: f32, offset_y: f32) {
+        self.offset_x = offset_x;
+        self.offset_y = offset_y;
+        self.update_transform_out();
+    }
+
+    pub fn resize(&mut self, canvas_width: u32, canvas_height: u32) {
+        self.canvas_width = canvas_width;
+        self.canvas_height = canvas_height;
+        self.update_transform_out();
+    }
+
+    fn update_transform_out(&mut self) {
+        self.transform_out = canvas_to_graphic(
+            self.ppcm,
+            self.zoom,
+            self.canvas_width,
+            self.canvas_height,
+            self.offset_x,
+            self.offset_y,
+        );
+
+        self.reset(
+            self.screens
+                .iter()
+                .map(|s| s.remove_indexes())
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    pub fn prepare(&mut self, device: &Device, queue: &Queue) {
+        self.line_render_pipeline.prepare(device, queue);
     }
 
     pub fn paint<'rpass>(&'rpass self, rpass: &mut RenderPass<'rpass>) {
-         // Draw our triangle!
-        rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, &self.bind_group, &[]);
-        rpass.draw(0..3, 0..1);
+        self.line_render_pipeline.paint(rpass);
     }
 }
