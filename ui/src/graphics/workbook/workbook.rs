@@ -6,7 +6,7 @@ use lyon_tessellation::{FillTessellator, StrokeTessellator};
 use wgpu::{Device, Queue, RenderPass};
 
 use super::{
-    coordinates::{canvas_to_graphic, screen_to_canvas, CanvasScope, GraphicScope, CanvasPoint},
+    coordinates::{canvas_to_ndc, screen_to_canvas, CanvasScope, NdcScope, FbScope, canvas_to_fb},
     line::{Line, LineRenderPipeline},
     screen::{IndexedScreenItems, IndexedScreenWithChild, Screen, ScreenItems, ScreenWithChild},
     IndexedItem, Item,
@@ -29,8 +29,13 @@ pub struct Workbook {
     canvas_width: u32,
     canvas_height: u32,
 
-    /// Canvas to graphic transformer
-    transform_out: Transform2D<f32, CanvasScope, GraphicScope>,
+    canvas_min_x: f32,
+    canvas_min_y: f32,
+
+    /// Canvas to NDC transformer
+    transform_to_ndc: Transform2D<f32, CanvasScope, NdcScope>,
+    /// Canvas to framebuffer transformer
+    transform_to_fb: Transform2D<f32, CanvasScope, FbScope>,
     /// To render lines
     line_render_pipeline: LineRenderPipeline,
     screens: Vec<IndexedScreenWithChild>,
@@ -45,7 +50,16 @@ impl Workbook {
             line_render_pipeline,
             fill_tessellator: FillTessellator::new(),
             stroke_tessellator: StrokeTessellator::new(),
-            transform_out: Transform2D {
+            transform_to_ndc: Transform2D {
+                m11: 0.0,
+                m12: 0.0,
+                m21: 0.0,
+                m22: 0.0,
+                m31: 0.0,
+                m32: 0.0,
+                _unit: PhantomData,
+            },
+            transform_to_fb: Transform2D {
                 m11: 0.0,
                 m12: 0.0,
                 m21: 0.0,
@@ -56,6 +70,8 @@ impl Workbook {
             },
             canvas_width: 0,
             canvas_height: 0,
+            canvas_min_x: 0.0,
+            canvas_min_y: 0.0,
             zoom: 1.0,
             offset_x: 0.0,
             offset_y: 0.0,
@@ -73,7 +89,9 @@ impl Workbook {
             let min = screen.meta.tl();
             let ppcm = screen.meta.get_ppcm();
             let sc_transform = screen_to_canvas(ppcm, min.x, min.y);
-            let sg_transform = sc_transform.then(&self.transform_out);
+            let sndc_transform = sc_transform.then(&self.transform_to_ndc);
+            let sfb_transform = sc_transform.then(&self.transform_to_fb);
+
             match screen.items {
                 ScreenItems::Items(items) => {
                     let mut indexed_items = Vec::new();
@@ -82,7 +100,7 @@ impl Workbook {
                             Item::Line(line) => {
                                 let line_index = self
                                     .line_render_pipeline
-                                    .add(line.to_line_raw(sg_transform));
+                                    .add(line.to_line_raw(screen.meta.clone(), sndc_transform, sfb_transform));
                                 indexed_items.push(IndexedItem::Line { line, line_index });
                             }
                         }
@@ -108,8 +126,9 @@ impl Workbook {
     pub fn add_line(&mut self, screen: Screen, line: Line) {
         let min = screen.tl();
         let sc_transform = screen_to_canvas(screen.get_ppcm(), min.x, min.y);
-        let sg_transform = sc_transform.then(&self.transform_out);
-        let line_raw = line.to_line_raw(sg_transform);
+        let sndc_transform = sc_transform.then(&self.transform_to_ndc);
+        let sfb_transform = sc_transform.then(&self.transform_to_fb);
+        let line_raw = line.to_line_raw(screen, sndc_transform, sfb_transform);
         self.line_render_pipeline.add(line_raw);
     }
 
@@ -124,20 +143,32 @@ impl Workbook {
         self.update_transform_out();
     }
 
-    pub fn resize(&mut self, canvas_width: u32, canvas_height: u32) {
+    pub fn resize(&mut self, canvas_width: u32, canvas_height: u32, canvas_min_x: f32, canvas_min_y: f32) {
+        dbg!(canvas_width, canvas_height, canvas_min_x, canvas_min_y);
         self.canvas_width = canvas_width;
         self.canvas_height = canvas_height;
+        self.canvas_min_x = canvas_min_x;
+        self.canvas_min_y = canvas_min_y;
         self.update_transform_out();
     }
 
     fn update_transform_out(&mut self) {
-        self.transform_out = canvas_to_graphic(
+        self.transform_to_ndc = canvas_to_ndc(
             self.ppcm,
             self.zoom,
             self.canvas_width,
             self.canvas_height,
             self.offset_x,
             self.offset_y,
+        );
+
+        self.transform_to_fb = canvas_to_fb(
+            self.ppcm,
+            self.zoom,
+            self.offset_x,
+            self.offset_y,
+            self.canvas_min_x,
+            self.canvas_min_y
         );
 
         self.reset(

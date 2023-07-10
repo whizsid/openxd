@@ -75,6 +75,10 @@ impl Screen {
         }
     }
 
+    pub fn resolution(&self) -> (u32, u32) {
+        self.resolution
+    }
+
     /// Returning the pixel count per one centimeter
     pub fn get_ppcm(&self) -> f32 {
         (((self.resolution.0 as f32) * 10000.0) / (self.width * 2.0))
