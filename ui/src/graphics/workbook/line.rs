@@ -1,9 +1,9 @@
-use euclid::{Transform2D, Vector2D};
+use euclid::{Transform2D, Vector2D, Point2D};
 
 use crate::graphics::{instance_buffer::InstanceBuffer, Color};
 
 use super::{
-    coordinates::{NdcScope, ScreenScope, FbScope},
+    coordinates::{NdcScope, ScreenScope, FbScope, ScreenPoint},
     StrokeStyle, UserSelectedPoint, screen::Screen,
 };
 
@@ -76,6 +76,13 @@ impl Line {
         let start = transform_fb.transform_point(start.cast());
         let end = transform_fb.transform_point(end.cast());
 
+        let min: Point2D<f32, ScreenScope> = ScreenPoint::new(0,0).cast();
+        let res = screen.resolution();
+        let max: Point2D<f32, ScreenScope> = ScreenPoint::new(res.0 as i32, res.1 as i32).cast();
+
+        let min_fb = transform_fb.transform_point(min);
+        let max_fb = transform_fb.transform_point(max);
+
         LineRaw {
             tl: tlg.to_array(),
             tr: trg.to_array(),
@@ -86,7 +93,8 @@ impl Line {
             width,
             stroke: self.stroke_style.to_raw(),
             start: start.to_array(),
-            end: end.to_array()
+            end: end.to_array(),
+            bbox: [min_fb.x, min_fb.y, max_fb.x, max_fb.y]
         }
     }
 }
@@ -114,6 +122,8 @@ pub struct LineRaw {
     start: [f32; 2],
     /// End coordinate of the line in framebuffer coordinate system
     end: [f32; 2],
+    /// Bounding box of the line in framebuffer coordinates (min_x, min_y, max_x, max_y)
+    bbox: [f32;4]
 }
 
 impl LineRaw {
@@ -183,7 +193,13 @@ impl LineRaw {
                     offset: mem::size_of::<([f32;15], [u32;2])>() as wgpu::BufferAddress,
                     shader_location: 9,
                     format: wgpu::VertexFormat::Float32x2,
-                }
+                },
+                // bbox
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<([f32;17], [u32;2])>() as wgpu::BufferAddress,
+                    shader_location: 10,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
             ],
         }
     }

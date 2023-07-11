@@ -6,7 +6,8 @@ struct VertexOutput {
     @location(1) width: f32,
     @location(2) stroke: u32,
     @location(3) start: vec2<f32>,
-    @location(4) end: vec2<f32>
+    @location(4) end: vec2<f32>,
+    @location(5) bbox: vec4<f32>
 };
 
 struct Line {
@@ -20,6 +21,7 @@ struct Line {
     @location(7) stroke: u32,
     @location(8) start: vec2<f32>,
     @location(9) end: vec2<f32>,
+    @location(10) bbox: vec4<f32>,
 }
 
 @vertex
@@ -28,12 +30,13 @@ fn vs_main(
     line: Line
 ) -> VertexOutput {
     var out: VertexOutput;
+
     out.color = line.color;
     out.width = line.width;
     out.stroke = line.stroke;
     out.start = line.start;
     out.end = line.end;
-
+    out.bbox = line.bbox;
 
     switch in_vertex_index {
         case 0u: {
@@ -124,6 +127,13 @@ fn distance_line(start: vec2<f32>, end: vec2<f32>, pos: vec2<f32>) -> f32 {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+
+    let bbox = in.bbox;
+
+    if bbox.x > in.position.x || bbox.z < in.position.x || bbox.y > in.position.y || bbox.w < in.position.y {
+        discard;
+    }
+
     switch in.stroke {
         case 1u: {
             let h = distance_line(in.start, in.end, in.position.xy);
@@ -202,7 +212,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
             let rad = sqrt(pow(h, 2.0) + pow(l, 2.0));
 
-            if rad > in.width*0.5 {
+            if rad > in.width * 0.5 {
                 discard;
             }
 

@@ -43,7 +43,7 @@ impl WorkbookCanvasComponent {
 
         let screens = vec![ScreenWithChild {
             meta: Screen::new(
-                CanvasPoint::new(0.0, 0.0),
+                CanvasPoint::new(20000.0, 20000.0),
                 71500.0,
                 146700.0,
                 (1170, 2532),
@@ -51,8 +51,8 @@ impl WorkbookCanvasComponent {
             ),
             items: ScreenItems::Items(vec![
                 Item::Line(Line {
-                    start: UserSelectedPoint::Fixed(ScreenPoint::new(200, 300)),
-                    end: UserSelectedPoint::Fixed(ScreenPoint::new(700, 1000)),
+                    start: UserSelectedPoint::Fixed(ScreenPoint::new(-130, -190)),
+                    end: UserSelectedPoint::Fixed(ScreenPoint::new(1200, 1000)),
                     width: 100,
                     stroke_style: StrokeStyle::Dotted,
                     color: Color::RGBA(Rgba::new(0.0, 1.0, 0.0, 1.0)),
