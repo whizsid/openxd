@@ -47,6 +47,9 @@ impl UserSelectedPoint {
 pub enum StrokeStyle {
     Normal,
     Double,
+    Dashed,
+    LongDashed,
+    Diamond,
     Dotted
 }
 
@@ -55,7 +58,10 @@ impl StrokeStyle {
         match self {
             Self::Normal => 0,
             Self::Double => 1,
-            Self::Dotted => 2
+            Self::Dashed => 2,
+            Self::LongDashed => 3,
+            Self::Diamond => 4,
+            Self::Dotted => 5
         }
     }
 }

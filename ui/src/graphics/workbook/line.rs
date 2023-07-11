@@ -1,4 +1,4 @@
-use euclid::{Point2D, Transform2D};
+use euclid::{Transform2D, Vector2D};
 
 use crate::graphics::{instance_buffer::InstanceBuffer, Color};
 
@@ -46,31 +46,23 @@ impl Line {
     ) -> LineRaw {
         let start = self.start.get_fixed_point(screen.resolution());
         let end = self.end.get_fixed_point(screen.resolution());
-        let a = start.x as f32;
-        let b = start.y as f32;
-        let c = end.x as f32;
-        let d = end.y as f32;
+        let a: Vector2D<f32, ScreenScope> = start.cast().to_vector();
+        let b: Vector2D<f32, ScreenScope> = end.cast().to_vector();
+        let v: Vector2D<f32, ScreenScope> = Vector2D::new(b.x - a.x, b.y - a.y);
+        let h = (self.width as f32) / 2.0;
 
-        let w = (self.width as f32) / 2.0;
+        let nl = v.length();
+        let n: Vector2D<f32, ScreenScope> = Vector2D::new(v.y/nl, -v.x/nl);
 
-        let cmn = ((c - a).powi(2) + (d - b).powi(2)).sqrt();
+        let tl = a + n * h;
+        let bl = a - n * h;
+        let tr = b + n * h;
+        let br = b - n * h;
 
-        let bl_x = a + w * (d - b) / cmn;
-        let bl_y = b - w * (c - a) / cmn;
-
-        let tl_x = a - w * (d - b) / cmn;
-        let tl_y = b + w * (c - a) / cmn;
-
-        let br_x = d + w * (c - a) / cmn;
-        let br_y = c - w * (d - b) / cmn;
-
-        let tr_x = d - w * (c - a) / cmn;
-        let tr_y = c + w * (d - b) / cmn;
-
-        let trs = Point2D::new(tr_x, tr_y);
-        let tls = Point2D::new(tl_x, tl_y);
-        let brs = Point2D::new(br_x, br_y);
-        let bls = Point2D::new(bl_x, bl_y);
+        let trs = tr.to_point();
+        let tls = tl.to_point();
+        let brs = br.to_point();
+        let bls = bl.to_point();
 
         let tlg = transform_ndc.transform_point(tls);
         let trg = transform_ndc.transform_point(trs);

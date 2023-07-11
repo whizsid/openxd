@@ -51,19 +51,9 @@ impl WorkbookCanvasComponent {
             ),
             items: ScreenItems::Items(vec![
                 Item::Line(Line {
-                    start: UserSelectedPoint::Fixed(ScreenPoint::new(100, 400)),
-                    end: UserSelectedPoint::Fixed(ScreenPoint::new(800, 800)),
-                    width: 20,
-                    stroke_style: StrokeStyle::Double,
-                    color: Color::RGBA(Rgba::new(1.0, 0.0, 0.0, 1.0)),
-                    start_edge: Edge::Normal,
-                    end_edge: Edge::Normal,
-                    z_index: 1,
-                }),
-                Item::Line(Line {
-                    start: UserSelectedPoint::Fixed( ScreenPoint::new(200, 200)),
-                    end: UserSelectedPoint::Fixed(ScreenPoint::new(700, 800)),
-                    width: 4,
+                    start: UserSelectedPoint::Fixed(ScreenPoint::new(200, 300)),
+                    end: UserSelectedPoint::Fixed(ScreenPoint::new(700, 1000)),
+                    width: 100,
                     stroke_style: StrokeStyle::Dotted,
                     color: Color::RGBA(Rgba::new(0.0, 1.0, 0.0, 1.0)),
                     start_edge: Edge::Normal,

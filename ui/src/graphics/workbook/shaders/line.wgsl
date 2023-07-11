@@ -22,14 +22,6 @@ struct Line {
     @location(9) end: vec2<f32>,
 }
 
-fn marker(center: vec2<f32>, position: vec2<f32>) -> bool {
-    if(distance(center, position) < 20.0) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
 @vertex
 fn vs_main(
     @builtin(vertex_index) in_vertex_index: u32,
@@ -68,22 +60,149 @@ fn vs_main(
     return out;
 }
 
+const DOUBLE_GAP:f32 = 0.1;
+const DASHED_GAP:f32 = 2.0;
+const DASHED_FILL:f32 = 2.0;
+const LONG_DASHED_GAP:f32 = 2.0;
+const LONG_DASHED_FILL:f32 = 4.0;
+const DIAMOND_GAP:f32 = 0.5;
+const DOT_GAP:f32 = 0.5;
+
+fn distance_line_edges(start: vec2<f32>, end: vec2<f32>, pos: vec2<f32>) -> vec2<f32> {
+    let a = start.x;
+    let b = start.y;
+    let c = end.x;
+    let d = end.y;
+
+    let i = pos.x;
+    let j = pos.y;
+
+    // Closest distance point on the line (u, v)
+    // ```
+    // 
+    //     -(c-a)[-(c-a)i - (d-b)j] - (d-b)[-a(d-b) + b(c-a)]
+    // u = --------------------------------------------------
+    //                  (d-b)^2 + (c-a)^2
+    //
+    //     (d-b)[(c-a)i + (d-b)j] + (c-a)[-a(d-b) + b(c-a)]
+    // v = -------------------------------------------------
+    //                  (d-b)^2 + (c-a)^2
+    // ```
+
+    let u = ((c - a) * ((c - a) * i + (d - b) * j) + (d - b) * (a * (d - b) - b * (c - a))) / (pow(d - b, 2.) + pow(c - a, 2.));
+    let v = ((d - b) * ((c - a) * i + (d - b) * j) + (c - a) * (b * (c - a) - a * (d - b))) / (pow(d - b, 2.) + pow(c - a, 2.));
+
+    let closest_point = vec2<f32>(u, v);
+
+    return vec2<f32>(distance(start, closest_point), distance(end, closest_point));
+}
+
+fn distance_line(start: vec2<f32>, end: vec2<f32>, pos: vec2<f32>) -> f32 {
+    let a = start.x;
+    let b = start.y;
+    let c = end.x;
+    let d = end.y;
+
+    let i = pos.x;
+    let j = pos.y;
+    // Equation of the line
+    // ```
+    // (d-b)x - (c-a)y - a(d-b) + b(c-a) = 0
+    // ```
+    //
+    // Distance to the line from (i,j)
+    // ```
+    //     |(d-b)i - (c-a)j - a(d-b) + b(c-a)|
+    // h = -----------------------------------
+    //           √((d-b)^2 + (c-a)^2)
+    // ```
+
+    let h = abs((d - b) * i - (c - a) * j - a * (d - b) + b * (c - a)) / sqrt(pow(d - b, 2.0) + pow(c - a, 2.0));
+
+    return h;
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-
     switch in.stroke {
         case 1u: {
-            var a = in.start.x;
-            var b = in.start.y;
-            var c = in.end.x;
-            var d = in.end.y;
+            let h = distance_line(in.start, in.end, in.position.xy);
 
-            var l = in.position.x;
-            var m = in.position.y;
+            if h < in.width * DOUBLE_GAP {
+                discard;
+            }
 
-            var h = abs((d-b)*l - (c-a)*m -a*(d-b) + b*(c-a))/sqrt(pow(d-b,2.0) + pow(c-a,2.0));
+            return in.color;
+        }
+        case 2u: {
+            let dis = distance_line_edges(in.start, in.end, in.position.xy);
 
-            if(h<in.width*0.2) {
+            if dis.y < in.width * DASHED_GAP {
+                return in.color;
+            }
+
+            let pattern = in.width * (DASHED_GAP + DASHED_FILL);
+            let remaining = dis.x % pattern;
+            if remaining < in.width * DASHED_FILL {
+                return in.color;
+            }
+            discard;
+        }
+        case 3u: {
+            let dis = distance_line_edges(in.start, in.end, in.position.xy);
+
+            if dis.y < in.width * LONG_DASHED_GAP {
+                return in.color;
+            }
+
+            let pattern = in.width * (LONG_DASHED_GAP + LONG_DASHED_FILL);
+            let remaining = dis.x % pattern;
+            if remaining < in.width * LONG_DASHED_FILL {
+                return in.color;
+            }
+            discard;
+        }
+        case 4u: {
+            let h = distance_line(in.start, in.end, in.position.xy);
+            let dis = distance_line_edges(in.start, in.end, in.position.xy);
+
+            let pattern = in.width * (1.0 + DIAMOND_GAP);
+            var l = dis.x % pattern;
+
+            if l > in.width {
+                discard;
+            }
+
+            if l > in.width * 0.5 {
+                l = in.width - l;
+            }
+
+            if h / l > 1.0 {
+                discard;
+            }
+
+            return in.color;
+        }
+        case 5u: {
+            let h = distance_line(in.start, in.end, in.position.xy);
+            let dis = distance_line_edges(in.start, in.end, in.position.xy);
+
+            let pattern = in.width * (1.0 + DIAMOND_GAP);
+            var l = dis.x % pattern;
+
+            if l > in.width {
+                discard;
+            }
+
+            if l > in.width * 0.5 {
+                l = l - in.width * 0.5;
+            } else {
+                l = in.width * 0.5 - l;
+            }
+
+            let rad = sqrt(pow(h, 2.0) + pow(l, 2.0));
+
+            if rad > in.width*0.5 {
                 discard;
             }
 
