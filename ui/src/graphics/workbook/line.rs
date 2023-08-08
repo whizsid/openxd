@@ -41,18 +41,18 @@ impl Line {
     pub fn to_line_raw(
         &self,
         screen: Screen,
-        transform_ndc: Transform2D<f32, ScreenScope, NdcScope>,
-        transform_fb: Transform2D<f32, ScreenScope, FbScope>
+        transform_ndc: Transform2D<f64, ScreenScope, NdcScope>,
+        transform_fb: Transform2D<f64, ScreenScope, FbScope>
     ) -> LineRaw {
-        let start = self.start.get_fixed_point(screen.resolution());
-        let end = self.end.get_fixed_point(screen.resolution());
-        let a: Vector2D<f32, ScreenScope> = start.cast().to_vector();
-        let b: Vector2D<f32, ScreenScope> = end.cast().to_vector();
-        let v: Vector2D<f32, ScreenScope> = Vector2D::new(b.x - a.x, b.y - a.y);
-        let h = (self.width as f32) / 2.0;
+        let start = self.start.get_fixed_exact_point(screen.resolution());
+        let end = self.end.get_fixed_exact_point(screen.resolution());
+        let a: Vector2D<f64, ScreenScope> = start.cast().to_vector();
+        let b: Vector2D<f64, ScreenScope> = end.cast().to_vector();
+        let v: Vector2D<f64, ScreenScope> = Vector2D::new(b.x - a.x, b.y - a.y);
+        let h = (self.width as f64) / 2.0;
 
         let nl = v.length();
-        let n: Vector2D<f32, ScreenScope> = Vector2D::new(v.y/nl, -v.x/nl);
+        let n: Vector2D<f64, ScreenScope> = Vector2D::new(v.y/nl, -v.x/nl);
 
         let tl = a + n * h;
         let bl = a - n * h;
@@ -64,24 +64,24 @@ impl Line {
         let brs = br.to_point();
         let bls = bl.to_point();
 
-        let tlg = transform_ndc.transform_point(tls);
-        let trg = transform_ndc.transform_point(trs);
-        let brg = transform_ndc.transform_point(brs);
-        let blg = transform_ndc.transform_point(bls);
+        let tlg = transform_ndc.transform_point(tls).cast();
+        let trg = transform_ndc.transform_point(trs).cast();
+        let brg = transform_ndc.transform_point(brs).cast();
+        let blg = transform_ndc.transform_point(bls).cast();
 
-        let trf = transform_fb.transform_point(trs);
-        let brf = transform_fb.transform_point(brs);
+        let trf: Point2D<f32, FbScope> = transform_fb.transform_point(trs).cast();
+        let brf: Point2D<f32, FbScope> = transform_fb.transform_point(brs).cast();
 
         let width = ( (trf.y - brf.y).powi(2) + (trf.x - brf.x).powi(2) ).sqrt();
-        let start = transform_fb.transform_point(start.cast());
-        let end = transform_fb.transform_point(end.cast());
+        let start: Point2D<f32, FbScope> = transform_fb.transform_point(start).cast();
+        let end: Point2D<f32, FbScope> = transform_fb.transform_point(end).cast();
 
-        let min: Point2D<f32, ScreenScope> = ScreenPoint::new(0,0).cast();
+        let min: Point2D<f64, ScreenScope> = ScreenPoint::new(0,0).cast();
         let res = screen.resolution();
-        let max: Point2D<f32, ScreenScope> = ScreenPoint::new(res.0 as i32, res.1 as i32).cast();
+        let max: Point2D<f64, ScreenScope> = ScreenPoint::new(res.0 as i32, res.1 as i32).cast();
 
-        let min_fb = transform_fb.transform_point(min);
-        let max_fb = transform_fb.transform_point(max);
+        let min_fb: Point2D<f32, FbScope> = transform_fb.transform_point(min).cast();
+        let max_fb: Point2D<f32, FbScope> = transform_fb.transform_point(max).cast();
 
         LineRaw {
             tl: tlg.to_array(),
@@ -263,7 +263,6 @@ impl LineRenderPipeline {
     }
 
     pub fn add(&mut self, line: LineRaw) -> usize {
-        dbg!(&line);
         self.buffer.add(line)
     }
 

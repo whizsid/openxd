@@ -9,7 +9,7 @@ use crate::graphics::{
         coordinates::{CanvasPoint, ScreenPoint},
         line::{Edge, Line},
         screen::{Screen, ScreenItems, ScreenWithChild},
-        Item, StrokeStyle, Workbook, UserSelectedPoint,
+        Item, StrokeStyle, Workbook, UserSelectedPoint, rectangle::Rectangle,
     },
     Color,
 };
@@ -60,6 +60,12 @@ impl WorkbookCanvasComponent {
                     end_edge: Edge::Normal,
                     z_index: 1,
                 }),
+                Item::Rectangle(Rectangle {
+                    center: UserSelectedPoint::Fixed(ScreenPoint::new(60, 100)),
+                    rotation: 0.0,
+                    width: 200,
+                    height: 300
+                })
             ]),
         }];
 
@@ -82,7 +88,7 @@ impl UIComponent for WorkbookCanvasComponent {
             .prepare(move |device, queue, ce, paint_callback_resources| {
                 let workbook: &mut Workbook = paint_callback_resources.get_mut().unwrap();
                 if resized {
-                    workbook.resize(available_size.x as u32, available_size.y as u32, rect_cloned.min.x, rect_cloned.min.y);
+                    workbook.resize(available_size.x as u32, available_size.y as u32, rect_cloned.min.x as f64, rect_cloned.min.y as f64);
                 }
 
                 let mut command_bus_locked = command_bus.lock();

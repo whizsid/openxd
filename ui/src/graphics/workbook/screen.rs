@@ -28,6 +28,7 @@ impl IndexedScreenWithChild {
                     .into_iter()
                     .map(|i| match i {
                         IndexedItem::Line { line, .. } => Item::Line(line.clone()),
+                        IndexedItem::Rectangle { rectangle, ..} => Item::Rectangle(rectangle.clone())
                     })
                     .collect::<Vec<_>>(),
             ),
@@ -49,9 +50,9 @@ pub struct ScreenWithChild {
 pub struct Screen {
     min: CanvasPoint,
     /// Width in nano meters
-    width: f32,
+    width: f64,
     /// Height in nano meters
-    height: f32,
+    height: f64,
     /// Resolution in pixels
     resolution: (u32, u32),
     /// Title of the screen
@@ -61,8 +62,8 @@ pub struct Screen {
 impl Screen {
     pub fn new(
         min: CanvasPoint,
-        width: f32,
-        height: f32,
+        width: f64,
+        height: f64,
         resolution: (u32, u32),
         title: String,
     ) -> Screen {
@@ -81,17 +82,17 @@ impl Screen {
 
     /// Returning the pixel count per one centimeter
     pub fn get_ppcm(&self) -> f32 {
-        (((self.resolution.0 as f32) * 10000.0) / (self.width * 2.0))
-            + (((self.resolution.1 as f32) * 10000.0) / (self.height * 2.0))
+        ((((self.resolution.0 as f64) * 10000.0) / (self.width * 2.0)) as f32)
+            + ((((self.resolution.1 as f64) * 10000.0) / (self.height * 2.0)) as f32)
     }
 
     /// Returning the transformation for inner coordinate system
-    pub fn get_inner_transformation(&self) -> Transform2D<f32, ScreenScope, CanvasScope> {
+    pub fn get_inner_transformation(&self) -> Transform2D<f64, ScreenScope, CanvasScope> {
         screen_to_canvas(self.get_ppcm(), self.min.x, self.min.y)
     }
 
     /// Returning the transformation for outer coordinate system
-    pub fn get_outer_transformation(&self) -> Transform2D<f32, CanvasScope, ScreenScope> {
+    pub fn get_outer_transformation(&self) -> Transform2D<f64, CanvasScope, ScreenScope> {
         canvas_to_screen(self.get_ppcm(), self.min.x, self.min.y)
     }
 

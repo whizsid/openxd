@@ -42,7 +42,7 @@ pub struct FbScope;
 /// minus values to animate purposes.
 pub type ScreenPoint = Point2D<i32, ScreenScope>;
 
-pub type CanvasPoint = Point2D<f32, CanvasScope>;
+pub type CanvasPoint = Point2D<f64, CanvasScope>;
 
 pub type NdcPoint = Point2D<f32, NdcScope>;
 
@@ -62,9 +62,9 @@ pub fn ndc_to_canvas(
     zoom: f32,
     canvas_width: u32,
     canvas_height: u32,
-    offset_x: f32,
-    offset_y: f32,
-) -> Transform2D<f32, NdcScope, CanvasScope> {
+    offset_x: f64,
+    offset_y: f64,
+) -> Transform2D<f64, NdcScope, CanvasScope> {
     // Equation:-
     //
     // ```ignore
@@ -94,12 +94,12 @@ pub fn ndc_to_canvas(
     // ```
 
     Transform2D::new(
-        ((canvas_width as f32) * 10000.0 * zoom) / (ppcm * 2.0),
+        ((canvas_width as f64) * 10000.0 * (zoom as f64)) / ((ppcm as f64) * 2.0),
         0.0,
         0.0,
-        -((canvas_height as f32) * 10000.0 * zoom) / (ppcm * 2.0),
-        offset_x + ((canvas_width as f32) * 10000.0 * zoom) / (ppcm * 2.0),
-        offset_y + ((canvas_height as f32) * 10000.0 * zoom) / (ppcm * 2.0),
+        -((canvas_height as f64) * 10000.0 * (zoom as f64)) / ((ppcm as f64) * 2.0),
+        offset_x + ((canvas_width as f64) * 10000.0 * (zoom as f64)) / ((ppcm as f64) * 2.0),
+        offset_y + ((canvas_height as f64) * 10000.0 * (zoom as f64)) / ((ppcm as f64) * 2.0),
     )
 }
 
@@ -115,11 +115,11 @@ pub fn ndc_to_canvas(
 pub fn fb_to_canvas(
     ppcm: f32,
     zoom: f32,
-    offset_x: f32,
-    offset_y: f32,
-    canvas_min_x: f32,
-    canvas_min_y: f32
-) -> Transform2D<f32, FbScope, CanvasScope> {
+    offset_x: f64,
+    offset_y: f64,
+    canvas_min_x: f64,
+    canvas_min_y: f64
+) -> Transform2D<f64, FbScope, CanvasScope> {
     // Equation:-
     //
     // ```ignore
@@ -149,12 +149,12 @@ pub fn fb_to_canvas(
     // ```
 
     Transform2D::new(
-        (5000.0 * zoom) / ppcm,
+        (5000.0 * (zoom as f64)) / (ppcm as f64),
         0.0,
         0.0,
-        (5000.0 * zoom) / ppcm,
-        offset_x - (10000.0 * zoom * canvas_min_x) / ppcm,
-        offset_y - (10000.0 * zoom * canvas_min_y) / ppcm,
+        (5000.0 * (zoom as f64)) / (ppcm as f64),
+        offset_x - (10000.0 * (zoom as f64) * canvas_min_x) / (ppcm as f64),
+        offset_y - (10000.0 * (zoom as f64) * canvas_min_y) / (ppcm as f64),
     )
 }
 
@@ -165,9 +165,9 @@ pub fn fb_to_canvas(
 /// - `offset_y` :- y coordinate of the left top corner of the screen
 pub fn canvas_to_screen(
     ppcm: f32,
-    offset_x: f32,
-    offset_y: f32,
-) -> Transform2D<f32, CanvasScope, ScreenScope> {
+    offset_x: f64,
+    offset_y: f64,
+) -> Transform2D<f64, CanvasScope, ScreenScope> {
     // Equation
     //
     // ```ignore
@@ -196,12 +196,12 @@ pub fn canvas_to_screen(
     // ```
 
     Transform2D::new(
-        ppcm / 10000.0,
+        (ppcm as f64) / 10000.0,
         0.0,
         0.0,
-        ppcm / 10000.0,
-        -(offset_x * ppcm) / 10000.0,
-        -(offset_y * ppcm) / 10000.0,
+        (ppcm as f64) / 10000.0,
+        -(offset_x * (ppcm as f64)) / 10000.0,
+        -(offset_y * (ppcm as f64)) / 10000.0,
     )
 }
 
@@ -212,9 +212,9 @@ pub fn canvas_to_screen(
 /// - `offset_y` :- y coordinate of the left top corner of the screen
 pub fn screen_to_canvas(
     ppcm: f32,
-    offset_x: f32,
-    offset_y: f32,
-) -> Transform2D<f32, ScreenScope, CanvasScope> {
+    offset_x: f64,
+    offset_y: f64,
+) -> Transform2D<f64, ScreenScope, CanvasScope> {
     canvas_to_screen(ppcm, offset_x, offset_y)
         .inverse()
         .unwrap()
@@ -234,9 +234,9 @@ pub fn canvas_to_ndc(
     zoom: f32,
     canvas_width: u32,
     canvas_height: u32,
-    offset_x: f32,
-    offset_y: f32,
-) -> Transform2D<f32, CanvasScope, NdcScope> {
+    offset_x: f64,
+    offset_y: f64,
+) -> Transform2D<f64, CanvasScope, NdcScope> {
     ndc_to_canvas(ppcm, zoom, canvas_width, canvas_height, offset_x, offset_y)
         .inverse()
         .unwrap()
@@ -255,11 +255,11 @@ pub fn canvas_to_ndc(
 pub fn canvas_to_fb(
     ppcm: f32,
     zoom: f32,
-    offset_x: f32,
-    offset_y: f32,
-    canvas_min_x: f32,
-    canvas_min_y: f32
-) -> Transform2D<f32, CanvasScope, FbScope> {
+    offset_x: f64,
+    offset_y: f64,
+    canvas_min_x: f64,
+    canvas_min_y: f64
+) -> Transform2D<f64, CanvasScope, FbScope> {
     fb_to_canvas(ppcm, zoom, offset_x, offset_y, canvas_min_x, canvas_min_y)
         .inverse()
         .unwrap()
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     pub fn test_canvas_to_screen_without_offset() {
-        let transformed: Point2D<f32, ScreenScope> = canvas_to_screen(163.63636363636363, 0.0, 0.0)
+        let transformed: Point2D<f64, ScreenScope> = canvas_to_screen(163.63636363636363, 0.0, 0.0)
             .transform_point(CanvasPoint::new(20000.0, 30000.0));
 
         assert_eq!(
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     pub fn test_canvas_to_screen() {
-        let transformed: Point2D<f32, ScreenScope> =
+        let transformed: Point2D<f64, ScreenScope> =
             canvas_to_screen(163.63636363636363, 15000.0, 15000.0)
                 .transform_point(CanvasPoint::new(20000.0, 30000.0));
 
