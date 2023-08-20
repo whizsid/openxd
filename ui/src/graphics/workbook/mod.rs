@@ -4,6 +4,7 @@ pub mod rectangle;
 pub mod screen;
 mod workbook;
 
+use colorgrad::Gradient;
 use euclid::Point2D;
 pub use workbook::Workbook;
 
@@ -12,6 +13,8 @@ use self::{
     line::Line,
     rectangle::Rectangle,
 };
+
+use super::Color;
 
 #[derive(Clone, Debug)]
 pub enum UserSelectedPoint {
@@ -122,4 +125,13 @@ pub enum IndexedItem {
 pub enum Item {
     Line(Line),
     Rectangle(Rectangle),
+}
+
+#[derive(Clone, Debug)]
+pub enum Background {
+    Color(Color),
+    Image,
+    Brightness(f32),
+    Contrast(f32),
+    Invert,
 }

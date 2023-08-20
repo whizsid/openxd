@@ -9,7 +9,7 @@ use crate::graphics::{
         coordinates::{CanvasPoint, ScreenPoint},
         line::{Edge, Line},
         screen::{Screen, ScreenItems, ScreenWithChild},
-        Item, StrokeStyle, Workbook, UserSelectedPoint, rectangle::Rectangle,
+        Item, StrokeStyle, Workbook, UserSelectedPoint, rectangle::Rectangle, Background,
     },
     Color,
 };
@@ -55,7 +55,7 @@ impl WorkbookCanvasComponent {
                     end: UserSelectedPoint::Fixed(ScreenPoint::new(1200, 1000)),
                     width: 100,
                     stroke_style: StrokeStyle::Dotted,
-                    color: Color::RGBA(Rgba::new(0.0, 1.0, 0.0, 1.0)),
+                    color: Color::RGBA(Rgba::new(1.0, 0.0, 0.0, 0.5)),
                     start_edge: Edge::Normal,
                     end_edge: Edge::Normal,
                     z_index: 1,
@@ -64,7 +64,8 @@ impl WorkbookCanvasComponent {
                     center: UserSelectedPoint::Fixed(ScreenPoint::new(60, 100)),
                     rotation: 0.0,
                     width: 200,
-                    height: 300
+                    height: 300,
+                    backgrounds: vec![Background::Color(Color::RGBA([0.0,0.0,1.0,0.5].into()))]
                 })
             ]),
         }];

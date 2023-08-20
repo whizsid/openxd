@@ -7,7 +7,7 @@ pub use lyon_tessellation::math::Point;
 pub use lyon_tessellation::path::Path;
 use palette::rgb::Rgba;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Color {
     RGBA(Rgba),
 }
