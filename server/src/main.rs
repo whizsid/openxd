@@ -320,7 +320,9 @@ pub async fn test_auth_handler(_req: Request<Body>) -> Result<Response<Body>, Er
     let user: User = if let Some(exist_user) = exist_user {
         exist_user
     } else {
-        db.create(user.id.clone().unwrap()).content(user).await?
+        let new_user: Option<Vec<User>> = db.create(user.id.clone().unwrap()).content(user).await?;
+        let mut new_user = new_user.unwrap();
+        new_user.pop().unwrap()
     };
 
     let key: Hmac<Sha256> = Hmac::new_from_slice(JWT_SECRET.as_bytes())
@@ -333,10 +335,10 @@ pub async fn test_auth_handler(_req: Request<Body>) -> Result<Response<Body>, Er
 
     let ticket = Ticket::new(user.id.unwrap());
 
-    let created_ticket: Ticket = db.create(Ticket::TABLE).content(ticket).await?;
+    let mut created_ticket: Vec<Ticket> = db.create(Ticket::TABLE).content(ticket).await?;
 
     let response = TestAuthResponse {
-        ticket: created_ticket.id.unwrap().id.to_string(),
+        ticket: created_ticket.pop().unwrap().id.unwrap().id.to_string(),
         token: token_str,
     };
 
@@ -583,13 +585,13 @@ pub async fn current_tab_snapshot_handler(
         thing(User::TABLE, user_id.0),
         tab.name
     );
-    let created_download: SnapshotDownload = db
+    let mut created_downloads: Vec<SnapshotDownload> = db
         .create(SnapshotDownload::TABLE)
         .content(snapshot_download)
         .await?;
 
     let success_response =
-        CurrentTabSnapshotResponse::new(created_download.id.unwrap().id.to_string());
+        CurrentTabSnapshotResponse::new(created_downloads.pop().unwrap().id.unwrap().id.to_string());
     let json_content = to_string(&success_response).unwrap();
     return Ok(Response::builder()
         .status(StatusCode::CREATED)

@@ -15,7 +15,8 @@ struct Rectangle {
     @location(4) bbox: vec4<f32>,
     @location(5) bg_types_1: vec4<u32>,
     @location(6) bg_types_2: vec4<u32>,
-    @location(7) bg_color: vec4<f32>
+    @location(7) bg_color: vec4<f32>,
+    @location(8) depth: u32
 }
 
 struct Background {

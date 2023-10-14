@@ -22,6 +22,7 @@ pub struct Rectangle {
     pub height: u32,
     pub rotation: f32,
     pub backgrounds: Vec<Background>,
+    pub z_index: u16,
 }
 
 impl Rectangle {
@@ -94,6 +95,7 @@ impl Rectangle {
             bg_types_1: bg_types[0..4].try_into().unwrap(),
             bg_types_2: bg_types[0..4].try_into().unwrap(),
             bg_color,
+            depth: self.z_index as u32,
         }
     }
 }
@@ -109,6 +111,7 @@ pub struct RectangleRaw {
     bg_types_1: [u8; 4],
     bg_types_2: [u8; 4],
     bg_color: [f32; 4],
+    depth: u32
 }
 
 impl RectangleRaw {
@@ -159,6 +162,11 @@ impl RectangleRaw {
                     shader_location: 7,
                     format: wgpu::VertexFormat::Float32x4,
                 },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<([f32; 16], [u8; 8])>() as wgpu::BufferAddress,
+                    shader_location: 8,
+                    format: wgpu::VertexFormat::Uint32,
+                }
             ],
         }
     }

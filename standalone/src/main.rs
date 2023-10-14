@@ -47,12 +47,11 @@ async fn main() {
 
     let mut exist_user: Option<User> = db.select((User::TABLE, USER_ID)).await.unwrap();
     if exist_user.is_none() {
-        exist_user = Some(
-            db.create((User::TABLE, USER_ID))
-                .content(User::new(String::from("Root")))
-                .await
-                .unwrap(),
-        );
+        exist_user = db
+            .create((User::TABLE, USER_ID))
+            .content(User::new(String::from("Root")))
+            .await
+            .unwrap();
     }
 
     let app = Arc::new(Mutex::new(App::new(db.clone())));

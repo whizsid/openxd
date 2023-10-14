@@ -127,13 +127,15 @@ pub async fn create_project_using_existing_file<
                     .map_err(|e| CreateProjectUsingExistingFileError::Storage(e))?;
             }
             let replaced_snapshot = Snapshot::new(replaced_oxd);
-            let created_snapshot: Snapshot<SI> = db
+            let created_snapshot: Vec<Snapshot<SI>> = db
                 .create(Snapshot::<SI>::TABLE)
                 .content(replaced_snapshot.clone())
                 .await?;
+            let created_snapshot = created_snapshot.last().unwrap().clone();
 
             let branch = Branch::new::<SI>(String::from(DEFAULT_BRANCH), None);
-            let created_branch: Branch = db.create(Branch::TABLE).content(branch).await?;
+            let mut created_branch: Vec<Branch> = db.create(Branch::TABLE).content(branch).await?;
+            let created_branch = created_branch.pop().unwrap();
 
             let commit = Commit::new::<SI>(
                 String::from("Initial Commit"),
@@ -142,7 +144,7 @@ pub async fn create_project_using_existing_file<
                 None,
                 created_snapshot.id.unwrap(),
             );
-            let _created_commit: Commit = db.create(Commit::TABLE).content(commit).await?;
+            let _created_commit: Vec<Commit> = db.create(Commit::TABLE).content(commit).await?;
 
             let file_name_without_sym_spc = remove_symbols_and_extra_spaces(project_name.clone());
             let slug = file_name_without_sym_spc.to_lowercase().replace("", "-");
@@ -154,7 +156,8 @@ pub async fn create_project_using_existing_file<
                 created_branch.id.unwrap(),
                 thing(User::TABLE, user_id),
             );
-            let created_project = db.create(Project::TABLE).content(project).await?;
+            let mut created_project: Vec<Project> = db.create(Project::TABLE).content(project).await?;
+            let created_project = created_project.pop().unwrap();
 
             return Ok(created_project);
         }

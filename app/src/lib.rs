@@ -47,11 +47,12 @@ impl<D: Connection> App<D> {
         internal_client: T,
         storage: Arc<S>,
     ) -> Result<Session<SE, SI, S, TE, T, D>, surrealdb::Error> {
-        let session_data: SessionModel = self
+        let mut session_data: Vec<SessionModel> = self
             .db
             .create(SessionModel::TABLE)
             .content(SessionModel::create(thing(User::TABLE, user_id.clone())))
             .await?;
+        let session_data = session_data.pop().unwrap();
         Ok(Session::new(
             session_data,
             internal_client,
@@ -165,14 +166,16 @@ impl<
         let oxd = OxdXml::<SI>::new();
         let snapshot = Snapshot::new(oxd);
 
-        let created_oxd: Snapshot<SI> = self
+        let mut created_oxd: Vec<Snapshot<SI>> = self
             .db
             .create(Snapshot::<SI>::TABLE)
             .content(snapshot)
             .await?;
+        let created_oxd = created_oxd.pop().unwrap();
 
         let branch = Branch::new::<SI>(String::from(DEFAULT_BRANCH), None);
-        let created_branch: Branch = self.db.create(Branch::TABLE).content(branch).await?;
+        let mut created_branch: Vec<Branch> = self.db.create(Branch::TABLE).content(branch).await?;
+        let created_branch = created_branch.pop().unwrap();
 
         let commit = Commit::new::<SI>(
             String::from("Initial Commit"),
@@ -181,7 +184,7 @@ impl<
             None,
             created_oxd.id.unwrap(),
         );
-        let _created_commit: Commit = self.db.create(Commit::TABLE).content(commit).await?;
+        let _created_commit: Vec<Commit> = self.db.create(Commit::TABLE).content(commit).await?;
 
         let file_name_without_sym_spc = remove_symbols_and_extra_spaces(project_name.clone());
         let slug = file_name_without_sym_spc.to_lowercase().replace("", "-");
@@ -193,7 +196,8 @@ impl<
             created_branch.id.unwrap(),
             thing(User::TABLE, self.user_id.clone()),
         );
-        let created_project: Project = self.db.create(Project::TABLE).content(project).await?;
+        let mut created_project: Vec<Project> = self.db.create(Project::TABLE).content(project).await?;
+        let created_project = created_project.pop().unwrap();
 
         Ok(created_project.id.unwrap().id.to_string())
     }
@@ -210,7 +214,8 @@ impl<
 
         let project = project.unwrap();
 
-        let default_branch: Branch = self.db.select(project.default_branch).await?;
+        let default_branch: Option<Branch> = self.db.select(project.default_branch).await?;
+        let default_branch = default_branch.unwrap();
 
         let mut commit_res = self.db.query("SELECT * FROM type::table($table) WHERE branch = $branch ORDER BY created_at DESC LIMIT 1")
             .bind(("table", Commit::TABLE))
@@ -219,7 +224,8 @@ impl<
         let commit: Option<Commit> = commit_res.take(0)?;
         let commit = commit.unwrap();
 
-        let mut snapshot: Snapshot<SI> = self.db.select(commit.snapshot).await?;
+        let snapshot: Option<Snapshot<SI>> = self.db.select(commit.snapshot).await?;
+        let mut snapshot = snapshot.unwrap();
         snapshot.id = None;
         let oxd = snapshot.oxd;
         let assets = oxd.get_assets();
@@ -235,11 +241,12 @@ impl<
 
         let replaced_oxd = oxd.replace_asset(&mut replaced_assets);
         let replaced_snapshot = Snapshot::new(replaced_oxd);
-        let created_snapshot: Snapshot<SI> = self
+        let mut created_snapshot: Vec<Snapshot<SI>> = self
             .db
             .create(Snapshot::<SI>::TABLE)
             .content(replaced_snapshot)
             .await?;
+        let created_snapshot = created_snapshot.pop().unwrap();
 
         let tab = Tab::new::<SI>(
             project.name,
@@ -248,7 +255,8 @@ impl<
             default_branch.id.unwrap(),
             created_snapshot.id.unwrap(),
         );
-        let created_tab: Tab = self.db.create(Tab::TABLE).content(tab).await?;
+        let mut created_tab: Vec<Tab> = self.db.create(Tab::TABLE).content(tab).await?;
+        let created_tab = created_tab.pop().unwrap();
 
         let mut updated_session = self.data.clone();
         updated_session.set_current_tab(created_tab.id.clone().unwrap());

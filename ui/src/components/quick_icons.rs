@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use egui::{Color32, FontFamily, FontId, Rgba, Rounding, Style, TextStyle};
+use egui::{Color32, FontFamily, FontId, Rgba, Rounding, Style, TextStyle, style::default_text_styles};
 
 use crate::scopes::ApplicationScope;
 
@@ -16,15 +16,13 @@ pub struct QuickIconsComponent {
 impl QuickIconsComponent {
     pub fn new(app_scope: ApplicationScope, style: &Style) -> QuickIconsComponent {
         let bg_fill = (Rgba::from(style.visuals.window_fill()) * Rgba::from_gray(0.7)).into();
+        let mut text_style = default_text_styles();
+        text_style.insert(TextStyle::Button, FontId::new(30.0, FontFamily::Name("system-ui".into())));
         QuickIconsComponent {
             _app_scope: app_scope,
             bg_fill,
             rounding: Rounding::default(),
-            text_style: [(
-                TextStyle::Button,
-                FontId::new(30.0, FontFamily::Name("system-ui".into())),
-            )]
-            .into(),
+            text_style,
         }
     }
 }

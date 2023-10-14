@@ -30,7 +30,7 @@ web-sys = {version = "^0.3", features = [
     ]}
 tracing-wasm = "^0.2"
 console_error_panic_hook = "^0.1"
-eframe = {version = "^0.22", default-features = false, features = ["accesskit","default_fonts", "wgpu"]}
+eframe = {version = "^0.23", default-features = false, features = ["accesskit","default_fonts", "wgpu"]}
 ui = { path = "../ui" }
 ws_stream_wasm = "^0.7"
 futures = "^0.3"

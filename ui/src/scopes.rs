@@ -5,7 +5,7 @@
 //! parameters for each component. Those scopes will avoid those redefinitions.
 use std::{sync::Arc, cell::{RefCell, Ref, RefMut}, rc::Rc};
 
-use egui_dock::Tree;
+use egui_dock::DockState;
 use futures::lock::Mutex;
 use transport::vo::Screen;
 
@@ -24,9 +24,9 @@ pub struct ApplicationScope {
     external_client: Arc<Box<dyn External>>,
     command_executor: Rc<RefCell<Executor>>,
     state: Rc<RefCell<AppState>>,
-    projects_tree: Rc<RefCell<Tree<usize>>>,
-    left_panel_tree: Rc<RefCell<Tree<LeftPanelTabKind>>>,
-    right_panel_tree: Rc<RefCell<Tree<RightPanelTabKind>>>,
+    projects_tree: Rc<RefCell<DockState<usize>>>,
+    left_panel_tree: Rc<RefCell<DockState<LeftPanelTabKind>>>,
+    right_panel_tree: Rc<RefCell<DockState<RightPanelTabKind>>>,
 }
 
 impl ApplicationScope {
@@ -34,10 +34,10 @@ impl ApplicationScope {
         client: Arc<Mutex<Box<dyn Client>>>,
         external_client: Arc<Box<dyn External>>,
     ) -> ApplicationScope {
-        let tree = Tree::new(vec![]);
+        let tree = DockState::new(vec![]);
         let left_panel_tree =
-            Tree::new(vec![LeftPanelTabKind::Layers, LeftPanelTabKind::Components]);
-        let right_panel_tree = Tree::new(vec![
+            DockState::new(vec![LeftPanelTabKind::Layers, LeftPanelTabKind::Components]);
+        let right_panel_tree = DockState::new(vec![
             RightPanelTabKind::Tool,
             RightPanelTabKind::Appearance,
             RightPanelTabKind::Properties,
@@ -99,15 +99,15 @@ impl ApplicationScope {
         self.projects_tree.borrow_mut().push_to_first_leaf(count - 1);
     }
 
-    pub fn projects_tree(&self) -> RefMut<Tree<usize>> {
+    pub fn projects_tree(&self) -> RefMut<DockState<usize>> {
         self.projects_tree.borrow_mut()
     }
 
-    pub fn left_panel_tree(&self) -> RefMut<Tree<LeftPanelTabKind>> {
+    pub fn left_panel_tree(&self) -> RefMut<DockState<LeftPanelTabKind>> {
         self.left_panel_tree.borrow_mut()
     }
 
-    pub fn right_panel_tree(&self) -> RefMut<Tree<RightPanelTabKind>> {
+    pub fn right_panel_tree(&self) -> RefMut<DockState<RightPanelTabKind>> {
         self.right_panel_tree.borrow_mut()
     }
 

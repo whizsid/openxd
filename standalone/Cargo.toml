@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 ui = {path = "../ui"}
-eframe = {version = "^0.22", default-features = false, features = ["accesskit", "default_fonts", "wgpu"]}
+eframe = {version = "^0.23", default-features = false, features = ["accesskit", "default_fonts", "wgpu"]}
 tokio = {version = "^1.27", features = ["rt", "macros", "rt-multi-thread", "time", "fs"]}
 futures = "^0.3"
 pin-project = "^1.0"

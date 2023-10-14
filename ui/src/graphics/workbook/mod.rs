@@ -4,7 +4,6 @@ pub mod rectangle;
 pub mod screen;
 mod workbook;
 
-use colorgrad::Gradient;
 use euclid::Point2D;
 pub use workbook::Workbook;
 

@@ -8,17 +8,17 @@ edition = "2021"
 
 [dependencies]
 rfd = "^0.11"
-egui = {version = "^0.22", default-features = false}
-egui_extras = {version = "^0.22", features = ["svg"]}
-egui_grid = "^0.2"
-egui_dock = "^0.6"
+egui = {version = "^0.23", default-features = false}
+egui_extras = {version = "^0.23", features = ["svg"]}
+egui_grid = {git = "https://github.com/whizsid/egui-grid.git"}
+egui_dock = "^0.8"
 futures = "^0.3"
 transport = {path = "../transport"}
 log = "^0.4"
 async-trait = "^0.1"
-egui-wgpu = "^0.22"
+egui-wgpu = "^0.23"
 regex = "^1.8"
-wgpu = "^0.16"
+wgpu = "^0.17"
 bytemuck = {version = "^1.13", features=["derive"]}
 lyon_tessellation = "^1.0"
 euclid = "^0.22"

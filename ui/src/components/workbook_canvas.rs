@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
-use egui::{mutex::Mutex, PaintCallback, Vec2};
-use egui_wgpu::{CallbackFn, RenderState};
+use egui::{mutex::Mutex, Vec2, Rect};
+use egui_wgpu::{CallbackTrait, RenderState};
 use palette::rgb::Rgba;
 
 use crate::graphics::{
     workbook::{
         coordinates::{CanvasPoint, ScreenPoint},
         line::{Edge, Line},
+        rectangle::Rectangle,
         screen::{Screen, ScreenItems, ScreenWithChild},
-        Item, StrokeStyle, Workbook, UserSelectedPoint, rectangle::Rectangle, Background,
+        Background, Item, StrokeStyle, UserSelectedPoint, Workbook,
     },
     Color,
 };
@@ -28,10 +29,7 @@ pub struct WorkbookCanvasComponent {
 impl WorkbookCanvasComponent {
     pub fn new(gb: &RenderState) -> WorkbookCanvasComponent {
         let workbook = Workbook::new(gb, 50.0);
-        gb.renderer
-            .write()
-            .paint_callback_resources
-            .insert(workbook);
+        gb.renderer.write().callback_resources.insert(workbook);
         WorkbookCanvasComponent {
             prev_size: Vec2 { x: 0.0, y: 0.0 },
             command_bus: Arc::new(Mutex::new(Vec::new())),
@@ -65,8 +63,9 @@ impl WorkbookCanvasComponent {
                     rotation: 0.0,
                     width: 200,
                     height: 300,
-                    backgrounds: vec![Background::Color(Color::RGBA([0.0,0.0,1.0,0.5].into()))]
-                })
+                    z_index: 1,
+                    backgrounds: vec![Background::Color(Color::RGBA([0.0, 0.0, 1.0, 0.5].into()))],
+                }),
             ]),
         }];
 
@@ -77,43 +76,66 @@ impl WorkbookCanvasComponent {
 impl UIComponent for WorkbookCanvasComponent {
     fn draw(&mut self, ui: &mut egui::Ui) {
         let available_size = ui.available_size();
-        let (rect, response) =
+        let (rect, _response) =
             ui.allocate_exact_size(available_size.clone(), egui::Sense::click_and_drag());
 
         let resized = available_size != self.prev_size;
         self.prev_size = available_size;
 
-        let rect_cloned = rect.clone();
         let command_bus = self.command_bus.clone();
-        let cb = CallbackFn::new()
-            .prepare(move |device, queue, ce, paint_callback_resources| {
-                let workbook: &mut Workbook = paint_callback_resources.get_mut().unwrap();
-                if resized {
-                    workbook.resize(available_size.x as u32, available_size.y as u32, rect_cloned.min.x as f64, rect_cloned.min.y as f64);
+
+        ui.painter().add(egui_wgpu::Callback::new_paint_callback(rect, CustomWgpuCallback {
+            command_bus,
+            resized,
+            rect
+        }));
+    }
+}
+
+struct CustomWgpuCallback {
+    command_bus: Arc<Mutex<Vec<WorkbookCanvasCommand>>>,
+    resized: bool,
+    rect: Rect,
+}
+
+impl CallbackTrait for CustomWgpuCallback {
+    fn prepare(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        _egui_encoder: &mut wgpu::CommandEncoder,
+        resources: &mut egui_wgpu::CallbackResources,
+    ) -> Vec<wgpu::CommandBuffer> {
+        let workbook: &mut Workbook = resources.get_mut().unwrap();
+        if self.resized {
+            workbook.resize(
+                self.rect.width() as u32,
+                self.rect.height() as u32,
+                self.rect.min.x as f64,
+                self.rect.min.y as f64,
+            );
+        }
+
+        let mut command_bus_locked = self.command_bus.lock();
+        while let Some(command) = command_bus_locked.pop() {
+            match command {
+                WorkbookCanvasCommand::ChangeTab(screens) => {
+                    workbook.reset(screens);
                 }
+            }
+        }
 
-                let mut command_bus_locked = command_bus.lock();
-                while let Some(command) = command_bus_locked.pop() {
-                    match command {
-                        WorkbookCanvasCommand::ChangeTab(screens) => {
-                            workbook.reset(screens);
-                        }
-                    }
-                }
+        workbook.prepare(device, queue);
+        vec![]
+    }
 
-                workbook.prepare(device, queue);
-                vec![]
-            })
-            .paint(move |_info, rpass, paint_callback_resources| {
-                let workbook: &Workbook = paint_callback_resources.get().unwrap();
-                workbook.paint(rpass);
-            });
-
-        let callback = PaintCallback {
-            rect,
-            callback: Arc::new(cb),
-        };
-
-        ui.painter().add(callback);
+    fn paint<'a>(
+        &self,
+        _info: egui::PaintCallbackInfo,
+        render_pass: &mut wgpu::RenderPass<'a>,
+        resources: &'a egui_wgpu::CallbackResources,
+    ) {
+        let workbook: &Workbook = resources.get().unwrap();
+        workbook.paint(render_pass);
     }
 }
